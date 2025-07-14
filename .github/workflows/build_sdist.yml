@@ -3,6 +3,7 @@
 name: Create sdist install and test
 
 on:
+  workflow_dispatch:
   push:
     branches: ["master"]
   pull_request:
