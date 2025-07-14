@@ -14,6 +14,7 @@ cimport numpy as np
 cimport cython
 
 from .algo_base import AlgoBase
+from ..utils import get_rng
 
 # For numpy arrays, it's important to use the cimport statement, and not
 # just a regular import.
@@ -84,9 +85,9 @@ class CoClustering(AlgoBase):
         cdef np.ndarray[int, ndim=1] cltr_u, cltr_i
 
         # initialize clusters at random
-        rng = self.get_rng(self.random_state)
-        cltr_u = rng.choice(self.n_cltr_u, self.trainset.n_users, replace=True)
-        cltr_i = rng.choice(self.n_cltr_i, self.trainset.n_items, replace=True)
+        rng = get_rng(self.random_state)
+        cltr_u = rng.choice(self.n_cltr_u, self.trainset.n_users, replace=True).astype(np.intc)
+        cltr_i = rng.choice(self.n_cltr_i, self.trainset.n_items, replace=True).astype(np.intc)
 
         for epoch in range(self.n_epochs):
 

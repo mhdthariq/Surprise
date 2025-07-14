@@ -113,7 +113,7 @@ def test_nearest_neighbors():
         (SVDpp(cache_ratings=True, random_state=0), 1.00284553561452),
         (NMF(random_state=0), 1.0865370266372372),
         (SlopeOne(), 1.1559939123891685),
-        (CoClustering(random_state=0), 1.0841941385276614),
+        (CoClustering(random_state=0), 1.0693305276037097),
     ],
 )
 def test_sanity_checks(u1_ml100k, pkf, algo, expected_rmse):
