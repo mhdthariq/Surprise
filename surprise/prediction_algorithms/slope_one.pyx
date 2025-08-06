@@ -1,38 +1,43 @@
 """
-the :mod:`slope_one` module includes the :class:`SlopeOne` algorithm.
+Cython implementation of the SlopeOne algorithm
 """
 
-
-
-
-cimport numpy as np  # noqa
+# python imports
 import numpy as np
 
+# cython imports
+cimport numpy as np
+cimport cython
+
 from .algo_base import AlgoBase
-from .predictions import PredictionImpossible
+
+# init numpy array in cython
+np.import_array()
 
 
 class SlopeOne(AlgoBase):
     """A simple yet accurate collaborative filtering algorithm.
 
-    This is a straightforward implementation of the SlopeOne algorithm
+    This is a straightforward implementation of the Slope One algorithm
     :cite:`lemire2007a`.
 
     The prediction :math:`\\hat{r}_{ui}` is set as:
 
     .. math::
-        \\hat{r}_{ui} = \\mu_u + \\frac{1}{
-        |R_i(u)|}
-        \\sum\\limits_{j \\in R_i(u)} \\text{dev}(i, j),
+        \hat{r}_{ui} = \mu_u + \\frac{1}{|R_i^u|} \sum_{j \in R_i^u}
+        \\text{dev}(i, j)
 
-    where :math:`R_i(u)` is the set of relevant items, i.e. the set of items
-    :math:`j` rated by :math:`u` that also have at least one common user with
-    :math:`i`. :math:`\\text{dev}_(i, j)` is defined as the average difference
-    between the ratings of :math:`i` and those of :math:`j`:
+    where :math:`R_i^u` is the set of items rated by :math:`u` that are
+    also in the neighborhood of :math:`i`.
+
+    :math:`\\text{dev}(i, j)` is the average difference of ratings between item
+    :math:`i` and item :math:`j`:
 
     .. math::
-        \\text{dev}(i, j) = \\frac{1}{
-        |U_{ij}|}\\sum\\limits_{u \\in U_{ij}} r_{ui} - r_{uj}
+        \\text{dev}(i, j) = \\frac{1}{|U_{ij}|} \sum_{u \in U_{ij}} r_{ui} -
+        r_{uj}
+
+    See :ref:`User Guide <slope_one>` for more details.
     """
 
     def __init__(self):
@@ -41,49 +46,63 @@ class SlopeOne(AlgoBase):
 
     def fit(self, trainset):
 
-        cdef int n_items = trainset.n_items
-
-        # Number of users having rated items i and j: |U_ij|
-        cdef long [:, ::1] freq = np.zeros((trainset.n_items, trainset.n_items), np.int_)
-        # Deviation from item i to item j: mean(r_ui - r_uj for u in U_ij)
-        cdef double [:, ::1] dev = np.zeros((trainset.n_items, trainset.n_items), np.double)
-        cdef int u, i, j, r_ui, r_uj
-
         AlgoBase.fit(self, trainset)
 
-        # Computation of freq and dev arrays.
-        for u, u_ratings in trainset.ur.items():
+        cdef np.ndarray[np.double_t, ndim=2] dev, freq
+        cdef int u, i, j
+        cdef double r_ui, r_uj
+        cdef list u_ratings
+
+        dev = np.zeros((self.trainset.n_items, self.trainset.n_items),
+                       np.double)
+        freq = np.zeros((self.trainset.n_items, self.trainset.n_items),
+                        np.int)
+
+        for u_ratings in self.trainset.ur.values():
             for i, r_ui in u_ratings:
                 for j, r_uj in u_ratings:
-                    freq[i, j] += 1
                     dev[i, j] += r_ui - r_uj
+                    freq[i, j] += 1
 
-        for i in range(n_items):
+        for i in range(self.trainset.n_items):
             dev[i, i] = 0
-            for j in range(i + 1, n_items):
-                dev[i, j] /= freq[i, j]
-                dev[j, i] = -dev[i, j]
+            for j in range(i + 1, self.trainset.n_items):
+                if freq[i, j] > 0:
+                    dev[i, j] /= freq[i, j]
+                    dev[j, i] = -dev[i, j]
 
-        self.freq = np.asarray(freq)
-        self.dev = np.asarray(dev)
-
-        # mean ratings of all users: mu_u
-        self.user_mean = [np.mean([r for (_, r) in trainset.ur[u]])
-                          for u in trainset.all_users()]
+        self.dev = dev
+        self.u_means = np.zeros(self.trainset.n_users)
+        for u, u_ratings in self.trainset.ur.items():
+            self.u_means[u] = np.mean([r for (_, r) in u_ratings])
 
         return self
 
     def estimate(self, u, i):
 
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
-            raise PredictionImpossible('User and/or item is unknown.')
+            # This case will be handled by the default prediction method, which
+            # is the global mean.
+            # BTW, this is not a PredictionImpossible, because we can still
+            # make a prediction.
+            return self.default_prediction()
 
-        # Ri: relevant items for i. This is the set of items j rated by u that
-        # also have common users with i (i.e. at least one user has rated both
-        # i and j).
-        Ri = [j for (j, _) in self.trainset.ur[u] if self.freq[i, j] > 0]
-        est = self.user_mean[u]
-        if Ri:
-            est += sum(self.dev[i, j] for j in Ri) / len(Ri)
+        cdef double num, den
+        cdef int j
+        cdef double r_uj
 
-        return est
+        # all items rated by u, with their ratings
+        u_ratings = self.trainset.ur[u]
+        num = 0
+        den = 0
+        for j, r_uj in u_ratings:
+            if j != i and self.dev[i, j] != 0:
+                num += (r_uj + self.dev[i, j])
+                den += 1
+
+        if den:
+            return num / den
+        else:
+            # User u has not rated any similar item to i. We return the mean
+            # of u's ratings.
+            return self.u_means[u]

@@ -16,9 +16,8 @@ cimport cython
 from .algo_base import AlgoBase
 from ..utils import get_rng
 
-# For numpy arrays, it's important to use the cimport statement, and not
-# just a regular import.
-# ctypedef np.int_t DTYPE_t
+# init numpy array in cython
+np.import_array()
 
 
 class CoClustering(AlgoBase):

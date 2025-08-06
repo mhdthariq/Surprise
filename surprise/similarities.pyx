@@ -1,331 +1,214 @@
 """
-The :mod:`similarities <surprise.similarities>` module includes tools to
-compute similarity metrics between users or items. You may need to refer to the
-:ref:`notation_standards` page. See also the
-:ref:`similarity_measures_configuration` section of the User Guide.
-
-Available similarity measures:
-
-.. autosummary::
-    :nosignatures:
-
-    cosine
-    msd
-    pearson
-    pearson_baseline
+Cython implementation of the similarity measures.
 """
 
-
-cimport numpy as np  # noqa
+# python imports
 import numpy as np
-from libc.math cimport sqrt
+
+# cython imports
+cimport numpy as np
+cimport cython
+
+# init numpy array in cython
+np.import_array()
 
 
-def cosine(int n_x, yr, int min_support):
-    """Compute the cosine similarity between all pairs of users (or items).
+@cython.boundscheck(False)
+def cosine(int n_x, dict yr, int min_support=1):
 
-    Only **common** users (or items) are taken into account. The cosine
-    similarity is defined as:
+    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef np.ndarray[np.double_t, ndim=1] norms
+    cdef int x, y, i, nb_common, i_x, i_y
+    cdef list x_ratings, y_ratings
+    cdef double r_x, r_y
 
-    .. math::
-        \\text{cosine_sim}(u, v) = \\frac{
-        \\sum\\limits_{i \\in I_{uv}} r_{ui} \\cdot r_{vi}}
-        {\\sqrt{\\sum\\limits_{i \\in I_{uv}} r_{ui}^2} \\cdot
-        \\sqrt{\\sum\\limits_{i \\in I_{uv}} r_{vi}^2}
-        }
+    sim = np.zeros((n_x, n_x), np.double)
+    norms = np.zeros(n_x, np.double)
 
-    or
+    for x in range(n_x):
+        for i, r_x in yr.get(x, []):
+            norms[x] += r_x * r_x
+        norms[x] = np.sqrt(norms[x])
 
-    .. math::
-        \\text{cosine_sim}(i, j) = \\frac{
-        \\sum\\limits_{u \\in U_{ij}} r_{ui} \\cdot r_{uj}}
-        {\\sqrt{\\sum\\limits_{u \\in U_{ij}} r_{ui}^2} \\cdot
-        \\sqrt{\\sum\\limits_{u \\in U_{ij}} r_{uj}^2}
-        }
+    for x in range(n_x):
+        for y in range(x, n_x):
 
-    depending on the ``user_based`` field of ``sim_options`` (see
-    :ref:`similarity_measures_configuration`).
+            # number of common items
+            # This is faster than len(set(yr[x]) & set(yr[y]))
+            nb_common = 0
+            i_x = 0
+            i_y = 0
+            x_ratings = yr.get(x, [])
+            y_ratings = yr.get(y, [])
 
-    For details on cosine similarity, see on `Wikipedia
-    <https://en.wikipedia.org/wiki/Cosine_similarity#Definition>`__.
-    """
+            while i_x < len(x_ratings) and i_y < len(y_ratings):
+                if x_ratings[i_x][0] < y_ratings[i_y][0]:
+                    i_x += 1
+                elif x_ratings[i_x][0] > y_ratings[i_y][0]:
+                    i_y += 1
+                else:  # same item. We can compute the dot product
+                    nb_common += 1
+                    sim[x, y] += x_ratings[i_x][1] * y_ratings[i_y][1]
+                    i_x += 1
+                    i_y += 1
 
-    # sum (r_xy * r_x'y) for common ys
-    cdef double [:, ::1] prods = np.zeros((n_x, n_x), np.double)
-    # number of common ys
-    cdef long [:, ::1] freq = np.zeros((n_x, n_x), np.int_)
-    # sum (r_xy ^ 2) for common ys
-    cdef double [:, ::1] sqi = np.zeros((n_x, n_x), np.double)
-    # sum (r_x'y ^ 2) for common ys
-    cdef double [:, ::1] sqj = np.zeros((n_x, n_x), np.double)
-    # the similarity matrix
-    cdef double [:, ::1] sim = np.zeros((n_x, n_x), np.double)
-
-    cdef int xi, xj, y
-    cdef double ri, rj
-    cdef int min_sprt = min_support
-
-    for y, y_ratings in yr.items():
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
-                freq[xi, xj] += 1
-                prods[xi, xj] += ri * rj
-                sqi[xi, xj] += ri**2
-                sqj[xi, xj] += rj**2
-
-    for xi in range(n_x):
-        sim[xi, xi] = 1
-        for xj in range(xi + 1, n_x):
-            if freq[xi, xj] < min_sprt:
-                sim[xi, xj] = 0
+            if nb_common >= min_support:
+                if norms[x] != 0 and norms[y] != 0:
+                    sim[x, y] /= norms[x] * norms[y]
             else:
-                denum = sqrt(sqi[xi, xj] * sqj[xi, xj])
-                sim[xi, xj] = prods[xi, xj] / denum
+                sim[x, y] = 0
 
-            sim[xj, xi] = sim[xi, xj]
+            sim[y, x] = sim[x, y]
 
-    return np.asarray(sim)
-
-
-def msd(int n_x, yr, int min_support):
-    """Compute the Mean Squared Difference similarity between all pairs of
-    users (or items).
-
-    Only **common** users (or items) are taken into account. The Mean Squared
-    Difference is defined as:
-
-    .. math ::
-        \\text{msd}(u, v) = \\frac{1}{|I_{uv}|} \\cdot
-        \\sum\\limits_{i \\in I_{uv}} (r_{ui} - r_{vi})^2
-
-    or
-
-    .. math ::
-        \\text{msd}(i, j) = \\frac{1}{|U_{ij}|} \\cdot
-        \\sum\\limits_{u \\in U_{ij}} (r_{ui} - r_{uj})^2
-
-    depending on the ``user_based`` field of ``sim_options`` (see
-    :ref:`similarity_measures_configuration`).
-
-    The MSD-similarity is then defined as:
-
-    .. math ::
-        \\text{msd_sim}(u, v) &= \\frac{1}{\\text{msd}(u, v) + 1}\\\\
-        \\text{msd_sim}(i, j) &= \\frac{1}{\\text{msd}(i, j) + 1}
-
-    The :math:`+ 1` term is just here to avoid dividing by zero.
+    return sim
 
 
-    For details on MSD, see third definition on `Wikipedia
-    <https://en.wikipedia.org/wiki/Root-mean-square_deviation#Formula>`__.
+@cython.boundscheck(False)
+def msd(int n_x, dict yr, int min_support=1):
 
-    """
+    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef int x, y, nb_common, i_x, i_y
+    cdef list x_ratings, y_ratings
+    cdef double r_x, r_y, msd
 
-    # sum (r_xy - r_x'y)**2 for common ys
-    cdef double [:, ::1] sq_diff = np.zeros((n_x, n_x), np.double)
-    # number of common ys
-    cdef long [:, ::1] freq = np.zeros((n_x, n_x), np.int_)
-    # the similarity matrix
-    cdef double [:, ::1] sim = np.zeros((n_x, n_x), np.double)
+    sim = np.zeros((n_x, n_x), np.double)
 
-    cdef int xi, xj
-    cdef double ri, rj
-    cdef int min_sprt = min_support
+    for x in range(n_x):
+        for y in range(x, n_x):
 
-    for y, y_ratings in yr.items():
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
-                sq_diff[xi, xj] += (ri - rj)**2
-                freq[xi, xj] += 1
+            # number of common items
+            # This is faster than len(set(yr[x]) & set(yr[y]))
+            nb_common = 0
+            msd = 0
+            i_x = 0
+            i_y = 0
+            x_ratings = yr.get(x, [])
+            y_ratings = yr.get(y, [])
 
-    for xi in range(n_x):
-        sim[xi, xi] = 1  # completely arbitrary and useless anyway
-        for xj in range(xi + 1, n_x):
-            if freq[xi, xj] < min_sprt:
-                sim[xi, xj] = 0
+            while i_x < len(x_ratings) and i_y < len(y_ratings):
+                if x_ratings[i_x][0] < y_ratings[i_y][0]:
+                    i_x += 1
+                elif x_ratings[i_x][0] > y_ratings[i_y][0]:
+                    i_y += 1
+                else:  # same item
+                    nb_common += 1
+                    msd += (x_ratings[i_x][1] - y_ratings[i_y][1])**2
+                    i_x += 1
+                    i_y += 1
+
+            if nb_common >= min_support:
+                sim[x, y] = 1 / (msd / nb_common + 1)
             else:
-                # return inverse of (msd + 1) (+ 1 to avoid dividing by zero)
-                sim[xi, xj] = 1 / (sq_diff[xi, xj] / freq[xi, xj] + 1)
+                sim[x, y] = 0
 
-            sim[xj, xi] = sim[xi, xj]
+            sim[y, x] = sim[x, y]
 
-    return np.asarray(sim)
-
-
-def pearson(int n_x, yr, int min_support):
-    """Compute the Pearson correlation coefficient between all pairs of users
-    (or items).
-
-    Only **common** users (or items) are taken into account. The Pearson
-    correlation coefficient can be seen as a mean-centered cosine similarity,
-    and is defined as:
-
-    .. math ::
-        \\text{pearson_sim}(u, v) = \\frac{ \\sum\\limits_{i \\in I_{uv}}
-        (r_{ui} -  \\mu_u) \\cdot (r_{vi} - \\mu_{v})} {\\sqrt{\\sum\\limits_{i
-        \\in I_{uv}} (r_{ui} -  \\mu_u)^2} \\cdot \\sqrt{\\sum\\limits_{i \\in
-        I_{uv}} (r_{vi} -  \\mu_{v})^2} }
-
-    or
-
-    .. math ::
-        \\text{pearson_sim}(i, j) = \\frac{ \\sum\\limits_{u \\in U_{ij}}
-        (r_{ui} -  \\mu_i) \\cdot (r_{uj} - \\mu_{j})} {\\sqrt{\\sum\\limits_{u
-        \\in U_{ij}} (r_{ui} -  \\mu_i)^2} \\cdot \\sqrt{\\sum\\limits_{u \\in
-        U_{ij}} (r_{uj} -  \\mu_{j})^2} }
-
-    depending on the ``user_based`` field of ``sim_options`` (see
-    :ref:`similarity_measures_configuration`).
+    return sim
 
 
-    Note: if there are no common users or items, similarity will be 0 (and not
-    -1).
+@cython.boundscheck(False)
+def pearson(int n_x, dict yr, int min_support=1):
 
-    For details on Pearson coefficient, see `Wikipedia
-    <https://en.wikipedia.org/wiki/Pearson_product-moment_correlation_coefficient#For_a_sample>`__.
+    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef int x, y, nb_common, i_x, i_y
+    cdef list x_ratings, y_ratings, common_ratings
+    cdef double r_x, r_y, num, den_x, den_y, x_mean, y_mean
 
-    """
-    # number of common ys
-    cdef long [:, ::1] freq = np.zeros((n_x, n_x), np.int_)
-    # sum (r_xy * r_x'y) for common ys
-    cdef double [:, ::1] prods = np.zeros((n_x, n_x), np.double)
-    # sum (rxy ^ 2) for common ys
-    cdef double [:, ::1] sqi = np.zeros((n_x, n_x), np.double)
-    # sum (rx'y ^ 2) for common ys
-    cdef double [:, ::1] sqj = np.zeros((n_x, n_x), np.double)
-    # sum (rxy) for common ys
-    cdef double [:, ::1] si = np.zeros((n_x, n_x), np.double)
-    # sum (rx'y) for common ys
-    cdef double [:, ::1] sj = np.zeros((n_x, n_x), np.double)
-    # the similarity matrix
-    cdef double [:, ::1] sim = np.zeros((n_x, n_x), np.double)
+    sim = np.zeros((n_x, n_x), np.double)
 
-    cdef int xi, xj, y, n
-    cdef double ri, rj, num, denum
-    cdef int min_sprt = min_support
+    for x in range(n_x):
+        for y in range(x, n_x):
 
-    for y, y_ratings in yr.items():
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
-                prods[xi, xj] += ri * rj
-                freq[xi, xj] += 1
-                sqi[xi, xj] += ri**2
-                sqj[xi, xj] += rj**2
-                si[xi, xj] += ri
-                sj[xi, xj] += rj
+            num = 0
+            den_x = 0
+            den_y = 0
+            nb_common = 0
 
-    for xi in range(n_x):
-        sim[xi, xi] = 1
-        for xj in range(xi + 1, n_x):
+            # This is faster than using set()
+            i_x = 0
+            i_y = 0
+            x_ratings = yr.get(x, [])
+            y_ratings = yr.get(y, [])
+            common_ratings = []
 
-            if freq[xi, xj] < min_sprt:
-                sim[xi, xj] = 0
-            else:
-                n = freq[xi, xj]
-                num = n * prods[xi, xj] - si[xi, xj] * sj[xi, xj]
-                denum = sqrt((n * sqi[xi, xj] - si[xi, xj]**2) *
-                             (n * sqj[xi, xj] - sj[xi, xj]**2))
-                if denum == 0:
-                    sim[xi, xj] = 0
-                else:
-                    sim[xi, xj] = num / denum
+            while i_x < len(x_ratings) and i_y < len(y_ratings):
+                if x_ratings[i_x][0] < y_ratings[i_y][0]:
+                    i_x += 1
+                elif x_ratings[i_x][0] > y_ratings[i_y][0]:
+                    i_y += 1
+                else:  # same item
+                    common_ratings.append((x_ratings[i_x][1], y_ratings[i_y][1]))
+                    i_x += 1
+                    i_y += 1
 
-            sim[xj, xi] = sim[xi, xj]
+            nb_common = len(common_ratings)
+            if nb_common >= min_support:
+                x_ratings_common = [r[0] for r in common_ratings]
+                y_ratings_common = [r[1] for r in common_ratings]
+                x_mean = np.mean(x_ratings_common)
+                y_mean = np.mean(y_ratings_common)
 
-    return np.asarray(sim)
+                for r_x, r_y in common_ratings:
+                    num += (r_x - x_mean) * (r_y - y_mean)
+                    den_x += (r_x - x_mean)**2
+                    den_y += (r_y - y_mean)**2
+
+                if den_x != 0 and den_y != 0:
+                    sim[x, y] = num / (np.sqrt(den_x) * np.sqrt(den_y))
+
+            sim[y, x] = sim[x, y]
+
+    return sim
 
 
-def pearson_baseline(
-    int n_x,
-    yr,
-    int min_support,
-    double global_mean,
-    double [::1] x_biases,
-    double [::1] y_biases,
-    double shrinkage=100,
-):
-    """Compute the (shrunk) Pearson correlation coefficient between all pairs
-    of users (or items) using baselines for centering instead of means.
+@cython.boundscheck(False)
+def pearson_baseline(int n_x, dict yr, int min_support, double global_mean,
+                     np.ndarray[np.double_t] bx, np.ndarray[np.double_t] by,
+                     int shrinkage=100):
 
-    The shrinkage parameter helps to avoid overfitting when only few ratings
-    are available (see :ref:`similarity_measures_configuration`).
+    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef int x, y, nb_common, i_x, i_y
+    cdef list x_ratings, y_ratings
+    cdef double r_x, r_y, num, den_x, den_y, dev_x, dev_y
 
-    The Pearson-baseline correlation coefficient is defined as:
+    sim = np.zeros((n_x, n_x), np.double)
 
-    .. math::
-        \\text{pearson_baseline_sim}(u, v) = \\hat{\\rho}_{uv} = \\frac{
-            \\sum\\limits_{i \\in I_{uv}} (r_{ui} -  b_{ui}) \\cdot (r_{vi} -
-            b_{vi})} {\\sqrt{\\sum\\limits_{i \\in I_{uv}} (r_{ui} -  b_{ui})^2}
-            \\cdot \\sqrt{\\sum\\limits_{i \\in I_{uv}} (r_{vi} -  b_{vi})^2}}
+    for x in range(n_x):
+        for y in range(x, n_x):
 
-    or
+            num = 0
+            den_x = 0
+            den_y = 0
+            nb_common = 0
 
-    .. math::
-        \\text{pearson_baseline_sim}(i, j) = \\hat{\\rho}_{ij} = \\frac{
-            \\sum\\limits_{u \\in U_{ij}} (r_{ui} -  b_{ui}) \\cdot (r_{uj} -
-            b_{uj})} {\\sqrt{\\sum\\limits_{u \\in U_{ij}} (r_{ui} -  b_{ui})^2}
-            \\cdot \\sqrt{\\sum\\limits_{u \\in U_{ij}} (r_{uj} -  b_{uj})^2}}
+            # This is faster than using set()
+            i_x = 0
+            i_y = 0
+            x_ratings = yr.get(x, [])
+            y_ratings = yr.get(y, [])
 
-    The shrunk Pearson-baseline correlation coefficient is then defined as:
+            while i_x < len(x_ratings) and i_y < len(y_ratings):
+                if x_ratings[i_x][0] < y_ratings[i_y][0]:
+                    i_x += 1
+                elif x_ratings[i_x][0] > y_ratings[i_y][0]:
+                    i_y += 1
+                else:  # same item
+                    nb_common += 1
+                    # deviation from baseline
+                    dev_x = x_ratings[i_x][1] - (global_mean + bx[x] +
+                                                by[x_ratings[i_x][0]])
+                    dev_y = y_ratings[i_y][1] - (global_mean + bx[y] +
+                                                by[y_ratings[i_y][0]])
+                    num += dev_x * dev_y
+                    den_x += dev_x**2
+                    den_y += dev_y**2
+                    i_x += 1
+                    i_y += 1
 
-    .. math::
-        \\text{pearson_baseline_shrunk_sim}(u, v) &= \\frac{|I_{uv}| - 1}
-        {|I_{uv}| - 1 + \\text{shrinkage}} \\cdot \\hat{\\rho}_{uv}
+            if nb_common >= min_support and den_x != 0 and den_y != 0:
+                sim[x, y] = (num / (np.sqrt(den_x) * np.sqrt(den_y)) *
+                             nb_common / (nb_common + shrinkage))
 
-        \\text{pearson_baseline_shrunk_sim}(i, j) &= \\frac{|U_{ij}| - 1}
-        {|U_{ij}| - 1 + \\text{shrinkage}} \\cdot \\hat{\\rho}_{ij}
+            sim[y, x] = sim[x, y]
 
-
-    Obviously, a shrinkage parameter of 0 amounts to no shrinkage at all.
-
-    Note: here again, if there are no common users/items, similarity will be 0
-    (and not -1).
-
-    Motivations for such a similarity measure can be found on the *Recommender
-    System Handbook*, section 5.4.1.
-    """
-
-    # number of common ys
-    cdef long [:, ::1] freq = np.zeros((n_x, n_x), np.int_)
-    # sum (r_xy - b_xy) * (r_x'y - b_x'y) for common ys
-    cdef double [:, ::1] prods = np.zeros((n_x, n_x), np.double)
-    # sum (r_xy - b_xy)**2 for common ys
-    cdef double [:, ::1] sq_diff_i = np.zeros((n_x, n_x), np.double)
-    # sum (r_x'y - b_x'y)**2 for common ys
-    cdef double [:, ::1] sq_diff_j = np.zeros((n_x, n_x), np.double)
-    # the similarity matrix
-    cdef double [:, ::1] sim = np.zeros((n_x, n_x), np.double)
-
-    cdef int y, xi, xj
-    cdef double ri, rj, diff_i, diff_j, partial_bias
-    cdef int min_sprt = min_support
-    cdef double global_mean_ = global_mean
-
-    # Need this because of shrinkage. When pearson coeff is zero when support
-    # is 1, so that's OK.
-    min_sprt = max(2, min_sprt)
-
-    for y, y_ratings in yr.items():
-        partial_bias = global_mean_ + y_biases[y]
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
-                freq[xi, xj] += 1
-                diff_i = (ri - (partial_bias + x_biases[xi]))
-                diff_j = (rj - (partial_bias + x_biases[xj]))
-                prods[xi, xj] += diff_i * diff_j
-                sq_diff_i[xi, xj] += diff_i**2
-                sq_diff_j[xi, xj] += diff_j**2
-
-    for xi in range(n_x):
-        sim[xi, xi] = 1
-        for xj in range(xi + 1, n_x):
-            if freq[xi, xj] < min_sprt:
-                sim[xi, xj] = 0
-            else:
-                sim[xi, xj] = prods[xi, xj] / (sqrt(sq_diff_i[xi, xj] * sq_diff_j[xi, xj]))
-                # the shrinkage part
-                sim[xi, xj] *= (freq[xi, xj] - 1) / (freq[xi, xj] - 1 + shrinkage)
-
-            sim[xj, xi] = sim[xi, xj]
-
-    return np.asarray(sim)
+    return sim

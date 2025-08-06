@@ -1,83 +1,76 @@
 """
-This module includes the two methods for baseline computation: stochastic
-gradient descent and alternating least squares.
+Cython implementation of the ALS and SGD optimization methods.
 """
 
-
-
-
-cimport numpy as np  # noqa
+# python imports
 import numpy as np
 
+# cython imports
+cimport numpy as np
+cimport cython
 
-def baseline_als(self):
-    """Optimize biases using ALS.
+# init numpy array in cython
+np.import_array()
 
-    Args:
-        self: The algorithm that needs to compute baselines.
 
-    Returns:
-        A tuple ``(bu, bi)``, which are users and items baselines.
-    """
+@cython.boundscheck(False)
+def als(algo):
 
-    # This piece of code is largely inspired by that of MyMediaLite:
-    # https://github.com/zenogantner/MyMediaLite/blob/master/src/MyMediaLite/RatingPrediction/UserItemBaseline.cs
-    # see also https://www.youtube.com/watch?v=gCaOa3W9kM0&t=32m55s
-    # (Alex Smola on RS, ML Class 10-701)
+    cdef np.ndarray[np.double_t] bu, bi
+    cdef int u, i, epoch
+    cdef double r, dev_u, dev_i
+    cdef int n_epochs, reg_u, reg_i
 
-    cdef double [::1] bu = np.zeros(self.trainset.n_users)
-    cdef double [::1] bi = np.zeros(self.trainset.n_items)
+    trainset = algo.trainset
+    bsl_options = algo.bsl_options
 
-    cdef int u, i
-    cdef double r, err, dev_i, dev_u
-    cdef double global_mean = self.trainset.global_mean
+    n_epochs = bsl_options.get('n_epochs', 10)
+    reg_u = bsl_options.get('reg_u', 15)
+    reg_i = bsl_options.get('reg_i', 10)
 
-    cdef int n_epochs = self.bsl_options.get('n_epochs', 10)
-    cdef double reg_u = self.bsl_options.get('reg_u', 15)
-    cdef double reg_i = self.bsl_options.get('reg_i', 10)
+    bu = np.zeros(trainset.n_users, np.double)
+    bi = np.zeros(trainset.n_items, np.double)
 
-    for dummy in range(n_epochs):
-        for i in self.trainset.all_items():
-            dev_i = 0
-            for (u, r) in self.trainset.ir[i]:
-                dev_i += r - global_mean - bu[u]
-
-            bi[i] = dev_i / (reg_i + len(self.trainset.ir[i]))
-
-        for u in self.trainset.all_users():
+    for epoch in range(n_epochs):
+        # compute new user biases
+        for u in range(trainset.n_users):
             dev_u = 0
-            for (i, r) in self.trainset.ur[u]:
-                dev_u += r - global_mean - bi[i]
-            bu[u] = dev_u / (reg_u + len(self.trainset.ur[u]))
+            for i, r in trainset.ur[u]:
+                dev_u += r - trainset.global_mean - bi[i]
+            bu[u] = dev_u / (reg_u + len(trainset.ur[u]))
 
-    return np.asarray(bu), np.asarray(bi)
+        # compute new item biases
+        for i in range(trainset.n_items):
+            dev_i = 0
+            for u, r in trainset.ir[i]:
+                dev_i += r - trainset.global_mean - bu[u]
+            bi[i] = dev_i / (reg_i + len(trainset.ir[i]))
+
+    return bu, bi
 
 
-def baseline_sgd(self):
-    """Optimize biases using SGD.
+@cython.boundscheck(False)
+def sgd(algo):
 
-    Args:
-        self: The algorithm that needs to compute baselines.
-
-    Returns:
-        A tuple ``(bu, bi)``, which are users and items baselines.
-    """
-
-    cdef double [::1] bu = np.zeros(self.trainset.n_users)
-    cdef double [::1] bi = np.zeros(self.trainset.n_items)
-
-    cdef int u, i
+    cdef np.ndarray[np.double_t] bu, bi
+    cdef int u, i, epoch
     cdef double r, err
-    cdef double global_mean = self.trainset.global_mean
+    cdef int n_epochs, reg, learning_rate
 
-    cdef int n_epochs = self.bsl_options.get('n_epochs', 20)
-    cdef double reg = self.bsl_options.get('reg', 0.02)
-    cdef double lr = self.bsl_options.get('learning_rate', 0.005)
+    trainset = algo.trainset
+    bsl_options = algo.bsl_options
 
-    for dummy in range(n_epochs):
-        for u, i, r in self.trainset.all_ratings():
-            err = (r - (global_mean + bu[u] + bi[i]))
-            bu[u] += lr * (err - reg * bu[u])
-            bi[i] += lr * (err - reg * bi[i])
+    n_epochs = bsl_options.get('n_epochs', 20)
+    reg = bsl_options.get('reg', 0.02)
+    learning_rate = bsl_options.get('learning_rate', 0.005)
 
-    return np.asarray(bu), np.asarray(bi)
+    bu = np.zeros(trainset.n_users, np.double)
+    bi = np.zeros(trainset.n_items, np.double)
+
+    for epoch in range(n_epochs):
+        for u, i, r in trainset.all_ratings():
+            err = r - (trainset.global_mean + bu[u] + bi[i])
+            bu[u] += learning_rate * (err - reg * bu[u])
+            bi[i] += learning_rate * (err - reg * bi[i])
+
+    return bu, bi
