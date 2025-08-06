@@ -4,13 +4,16 @@ class :class:`AlgoBase` from which every single prediction algorithm has to
 inherit.
 """
 import heapq
+from abc import ABC, abstractmethod
+from typing import Union, Tuple, Dict, Any, Optional
+import numpy as np
 
-from .. import similarities as sims
+from .. import similarities as sims  # type: ignore
 from .optimize_baselines import baseline_als, baseline_sgd
 from .predictions import Prediction, PredictionImpossible
 
 
-class AlgoBase:
+class AlgoBase(ABC):
     """Abstract class where is defined the basic behavior of a prediction
     algorithm.
 
@@ -27,6 +30,7 @@ class AlgoBase:
         self.sim_options = kwargs.get("sim_options", {})
         if "user_based" not in self.sim_options:
             self.sim_options["user_based"] = True
+        self.sim: Optional[np.ndarray] = None
 
     def fit(self, trainset):
         """Train an algorithm on a given training set.
@@ -50,6 +54,19 @@ class AlgoBase:
         self.bu = self.bi = None
 
         return self
+
+    @abstractmethod
+    def estimate(self, u, i) -> Union[float, Tuple[float, Dict[str, Any]]]:
+        """Estimate rating for user u and item i.
+
+        Args:
+            u: The (inner) user id.
+            i: The (inner) item id.
+
+        Returns:
+            The estimated rating, or a tuple (estimate, details_dict).
+        """
+        pass
 
     def predict(self, uid, iid, r_ui=None, clip=True, verbose=False):
         """Compute the rating prediction for given user and item.
@@ -229,7 +246,7 @@ class AlgoBase:
 
         min_support = self.sim_options.get("min_support", 1)
 
-        args = [n_x, yr, min_support]
+        args = [n_x, dict(yr), min_support]
 
         name = self.sim_options.get("name", "msd").lower()
         if name == "pearson_baseline":
@@ -281,12 +298,15 @@ class AlgoBase:
             to ``iid``.
         """
 
+        if self.sim is None:
+            raise RuntimeError("Similarity matrix not computed. Make sure to call fit() first.")
+
         if self.sim_options["user_based"]:
             all_instances = self.trainset.all_users
         else:
             all_instances = self.trainset.all_items
         others = [(x, self.sim[iid, x]) for x in all_instances() if x != iid]
-        others = heapq.nlargest(k, others, key=lambda tple: tple[1])
+        others = heapq.nlargest(k, others, key=lambda tple: float(tple[1]))
         k_nearest_neighbors = [j for (j, _) in others]
 
         return k_nearest_neighbors

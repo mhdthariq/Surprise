@@ -5,7 +5,7 @@ Module for testing prediction algorithms.
 
 import os
 
-import pytest
+import pytest  # type: ignore
 
 from surprise import (
     accuracy,

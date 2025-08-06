@@ -48,7 +48,8 @@ class SlopeOne(AlgoBase):
 
         AlgoBase.fit(self, trainset)
 
-        cdef np.ndarray[np.double_t, ndim=2] dev, freq
+        cdef np.ndarray[np.double_t, ndim=2] dev
+        cdef np.ndarray[np.int32_t, ndim=2] freq
         cdef int u, i, j
         cdef double r_ui, r_uj
         cdef list u_ratings
@@ -56,7 +57,7 @@ class SlopeOne(AlgoBase):
         dev = np.zeros((self.trainset.n_items, self.trainset.n_items),
                        np.double)
         freq = np.zeros((self.trainset.n_items, self.trainset.n_items),
-                        np.int)
+                        np.int32)
 
         for u_ratings in self.trainset.ur.values():
             for i, r_ui in u_ratings:

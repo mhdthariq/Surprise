@@ -74,3 +74,8 @@ def sgd(algo):
             bi[i] += learning_rate * (err - reg * bi[i])
 
     return bu, bi
+
+
+# Create aliases for backward compatibility
+baseline_als = als
+baseline_sgd = sgd

@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,10 @@ jobs:
           pip install tabulate
       - name: Install Surprise
         run: |
-          python -m pip install -e .
+          # Clean any cached builds to avoid ABI issues
+          rm -rf build/ dist/ *.egg-info/
+          # Force rebuild of Cython extensions with current numpy
+          pip install --no-cache-dir --force-reinstall -e .
       - name: Run Benchmarks
         run: |
           yes | python examples/benchmark.py

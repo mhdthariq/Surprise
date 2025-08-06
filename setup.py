@@ -1,7 +1,9 @@
-from setuptools import Extension, setup
+# Build script - setuptools and Cython are available as build dependencies
+from setuptools import Extension, setup  # type: ignore[import-untyped]
+from typing import List, Tuple, Optional
 
 import numpy as np
-from Cython.Build import cythonize
+from Cython.Build import cythonize  # type: ignore[import-untyped]
 
 """
 Prior to relying on PEP517/518 and using pyproject.toml, this setup.py used to
@@ -18,7 +20,7 @@ excluded from the sdist (in MANIFEST.in) anyway.
 
 Release instruction:
 
-Update changelog and contributors list. 
+Update changelog and contributors list.
 
 Basic local checks:
 - tests run correctly
@@ -67,7 +69,7 @@ Then, maybe, celebrate.
 """
 
 # This prevents Cython from using deprecated numpy C APIs
-define_macros = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")]
+define_macros: List[Tuple[str, Optional[str]]] = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")]
 
 # We're using numpy C APIs in our Cython code so Cython will generate C code
 # that requires the numpy headers. We need to tell the compiler where to find
