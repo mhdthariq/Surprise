@@ -9,21 +9,42 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-# init numpy array in cython
+# numpy compatibility - import these first
+from numpy cimport npy_intp
 np.import_array()
+
+# define numpy types for compatibility
+ctypedef np.float64_t DTYPE_t
+DTYPE = np.float64
+
+# Verify numpy compatibility
+cdef extern from "numpy/arrayobject.h":
+    int NPY_VERSION_MAJOR "NPY_VERSION_MAJOR"
+    int NPY_VERSION_MINOR "NPY_VERSION_MINOR"
+
+# Check numpy version compatibility at module init
+def _check_numpy_compatibility():
+    major, minor = np.__version__.split('.')[:2]
+    major, minor = int(major), int(minor)
+    # Support numpy 1.21+ and numpy 2.x
+    return (major == 1 and minor >= 21) or (major >= 2)
+
+# Perform the check
+if not _check_numpy_compatibility():
+    raise ImportError(f"Numpy version {np.__version__} is not compatible. Please use numpy >= 1.21.0")
 
 
 @cython.boundscheck(False)
 def cosine(int n_x, dict yr, int min_support=1):
 
-    cdef np.ndarray[np.double_t, ndim=2] sim
-    cdef np.ndarray[np.double_t, ndim=1] norms
+    cdef np.ndarray[DTYPE_t, ndim=2] sim
+    cdef np.ndarray[DTYPE_t, ndim=1] norms
     cdef int x, y, i, nb_common, i_x, i_y
     cdef list x_ratings, y_ratings
     cdef double r_x, r_y
 
-    sim = np.zeros((n_x, n_x), np.double)
-    norms = np.zeros(n_x, np.double)
+    sim = np.zeros((n_x, n_x), dtype=DTYPE)
+    norms = np.zeros(n_x, dtype=DTYPE)
 
     for x in range(n_x):
         for i, r_x in yr.get(x, []):
@@ -66,12 +87,12 @@ def cosine(int n_x, dict yr, int min_support=1):
 @cython.boundscheck(False)
 def msd(int n_x, dict yr, int min_support=1):
 
-    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef np.ndarray[DTYPE_t, ndim=2] sim
     cdef int x, y, nb_common, i_x, i_y
     cdef list x_ratings, y_ratings
     cdef double r_x, r_y, msd
 
-    sim = np.zeros((n_x, n_x), np.double)
+    sim = np.zeros((n_x, n_x), dtype=DTYPE)
 
     for x in range(n_x):
         for y in range(x, n_x):
@@ -109,12 +130,12 @@ def msd(int n_x, dict yr, int min_support=1):
 @cython.boundscheck(False)
 def pearson(int n_x, dict yr, int min_support=1):
 
-    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef np.ndarray[DTYPE_t, ndim=2] sim
     cdef int x, y, nb_common, i_x, i_y
     cdef list x_ratings, y_ratings, common_ratings
     cdef double r_x, r_y, num, den_x, den_y, x_mean, y_mean
 
-    sim = np.zeros((n_x, n_x), np.double)
+    sim = np.zeros((n_x, n_x), dtype=DTYPE)
 
     for x in range(n_x):
         for y in range(x, n_x):
@@ -163,15 +184,15 @@ def pearson(int n_x, dict yr, int min_support=1):
 
 @cython.boundscheck(False)
 def pearson_baseline(int n_x, dict yr, int min_support, double global_mean,
-                     np.ndarray[np.double_t] bx, np.ndarray[np.double_t] by,
+                     np.ndarray[DTYPE_t] bx, np.ndarray[DTYPE_t] by,
                      int shrinkage=100):
 
-    cdef np.ndarray[np.double_t, ndim=2] sim
+    cdef np.ndarray[DTYPE_t, ndim=2] sim
     cdef int x, y, nb_common, i_x, i_y
     cdef list x_ratings, y_ratings
     cdef double r_x, r_y, num, den_x, den_y, dev_x, dev_y
 
-    sim = np.zeros((n_x, n_x), np.double)
+    sim = np.zeros((n_x, n_x), dtype=DTYPE)
 
     for x in range(n_x):
         for y in range(x, n_x):

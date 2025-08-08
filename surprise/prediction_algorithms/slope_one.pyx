@@ -11,6 +11,14 @@ cimport cython
 
 from .algo_base import AlgoBase
 
+# numpy compatibility
+from numpy cimport npy_intp
+
+# define numpy types for compatibility
+ctypedef np.float64_t DTYPE_t
+ctypedef np.int32_t INT32_t
+DTYPE = np.float64
+
 # init numpy array in cython
 np.import_array()
 
@@ -48,16 +56,16 @@ class SlopeOne(AlgoBase):
 
         AlgoBase.fit(self, trainset)
 
-        cdef np.ndarray[np.double_t, ndim=2] dev
-        cdef np.ndarray[np.int32_t, ndim=2] freq
+        cdef np.ndarray[DTYPE_t, ndim=2] dev
+        cdef np.ndarray[INT32_t, ndim=2] freq
         cdef int u, i, j
         cdef double r_ui, r_uj
         cdef list u_ratings
 
         dev = np.zeros((self.trainset.n_items, self.trainset.n_items),
-                       np.double)
+                       dtype=DTYPE)
         freq = np.zeros((self.trainset.n_items, self.trainset.n_items),
-                        np.int32)
+                        dtype=np.int32)
 
         for u_ratings in self.trainset.ur.values():
             for i, r_ui in u_ratings:

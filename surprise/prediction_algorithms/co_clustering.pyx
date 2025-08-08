@@ -16,6 +16,14 @@ cimport cython
 from .algo_base import AlgoBase
 from ..utils import get_rng
 
+# numpy compatibility
+from numpy cimport npy_intp
+
+# define numpy types for compatibility
+ctypedef np.float64_t DTYPE_t
+ctypedef np.int32_t INT32_t
+DTYPE = np.float64
+
 # init numpy array in cython
 np.import_array()
 
@@ -79,9 +87,9 @@ class CoClustering(AlgoBase):
         self.n_cltr_i = min(self.n_cltr_i, self.trainset.n_items)
 
         # old user and item clusters
-        cdef np.ndarray[int, ndim=1] old_cltr_u, old_cltr_i
+        cdef np.ndarray[INT32_t, ndim=1] old_cltr_u, old_cltr_i
         # new user and item clusters
-        cdef np.ndarray[int, ndim=1] cltr_u, cltr_i
+        cdef np.ndarray[INT32_t, ndim=1] cltr_u, cltr_i
 
         # initialize clusters at random
         rng = get_rng(self.random_state)
@@ -145,9 +153,9 @@ class CoClustering(AlgoBase):
         """Compute the average rating of each user cluster, item cluster, and
         co-cluster."""
 
-        cdef np.ndarray[double, ndim=1] avg_cltr_u, u_sum_ratings, u_n_ratings
-        cdef np.ndarray[double, ndim=1] avg_cltr_i, i_sum_ratings, i_n_ratings
-        cdef np.ndarray[double, ndim=2] avg_cocltr, cocltr_sum_ratings, cocltr_n_ratings
+        cdef np.ndarray[DTYPE_t, ndim=1] avg_cltr_u, u_sum_ratings, u_n_ratings
+        cdef np.ndarray[DTYPE_t, ndim=1] avg_cltr_i, i_sum_ratings, i_n_ratings
+        cdef np.ndarray[DTYPE_t, ndim=2] avg_cocltr, cocltr_sum_ratings, cocltr_n_ratings
         cdef int u, i, r, cu, ci
 
         # The average rating of each user cluster
@@ -215,7 +223,7 @@ class CoClustering(AlgoBase):
         """Assign each user (or item) to its new cluster."""
 
         cdef int x, y, r, best_c, c
-        cdef np.ndarray[double, ndim=1] errs
+        cdef np.ndarray[DTYPE_t, ndim=1] errs
 
         if user_based:
             n_x = self.trainset.n_users

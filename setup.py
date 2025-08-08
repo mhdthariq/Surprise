@@ -68,8 +68,11 @@ In the mean time, upload to conda:
 Then, maybe, celebrate.
 """
 
-# This prevents Cython from using deprecated numpy C APIs
-define_macros: List[Tuple[str, Optional[str]]] = [("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")]
+# This prevents Cython from using deprecated numpy C APIs and ensures compatibility
+define_macros: List[Tuple[str, Optional[str]]] = [
+    ("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION"),
+    ("CYTHON_USE_TYPE_SLOTS", None),
+]
 
 # We're using numpy C APIs in our Cython code so Cython will generate C code
 # that requires the numpy headers. We need to tell the compiler where to find
@@ -123,7 +126,11 @@ extensions = cythonize(
         "wraparound": False,
         "initializedcheck": False,
         "nonecheck": False,
+        "embedsignature": True,
+        "always_allow_keywords": True,
     },
+    # Force rebuild to ensure compatibility
+    force=True,
 )
 
 setup(ext_modules=extensions)

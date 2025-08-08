@@ -9,6 +9,13 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
+# numpy compatibility
+from numpy cimport npy_intp
+
+# define numpy types for compatibility
+ctypedef np.float64_t DTYPE_t
+DTYPE = np.float64
+
 # init numpy array in cython
 np.import_array()
 
@@ -16,7 +23,7 @@ np.import_array()
 @cython.boundscheck(False)
 def als(algo):
 
-    cdef np.ndarray[np.double_t] bu, bi
+    cdef np.ndarray[DTYPE_t] bu, bi
     cdef int u, i, epoch
     cdef double r, dev_u, dev_i
     cdef int n_epochs, reg_u, reg_i
@@ -52,7 +59,7 @@ def als(algo):
 @cython.boundscheck(False)
 def sgd(algo):
 
-    cdef np.ndarray[np.double_t] bu, bi
+    cdef np.ndarray[DTYPE_t] bu, bi
     cdef int u, i, epoch
     cdef double r, err
     cdef int n_epochs, reg, learning_rate
