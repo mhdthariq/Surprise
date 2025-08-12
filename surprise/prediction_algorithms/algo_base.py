@@ -5,7 +5,8 @@ inherit.
 """
 import heapq
 from abc import ABC, abstractmethod
-from typing import Union, Tuple, Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple, Union
+
 import numpy as np
 
 from .. import similarities as sims  # type: ignore
@@ -299,7 +300,9 @@ class AlgoBase(ABC):
         """
 
         if self.sim is None:
-            raise RuntimeError("Similarity matrix not computed. Make sure to call fit() first.")
+            raise RuntimeError(
+                "Similarity matrix not computed. Make sure to call fit() first."
+            )
 
         if self.sim_options["user_based"]:
             all_instances = self.trainset.all_users

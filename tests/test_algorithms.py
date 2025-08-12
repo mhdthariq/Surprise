@@ -123,4 +123,6 @@ def test_sanity_checks(u1_ml100k, pkf, algo, expected_rmse):
     algo.fit(trainset)
     predictions = algo.test(testset)
     assert not all(pred.details["was_impossible"] for pred in predictions)
-    assert accuracy.rmse(predictions, verbose=False) == pytest.approx(expected_rmse, rel=8e-2, abs=8e-2)
+    assert accuracy.rmse(predictions, verbose=False) == pytest.approx(
+        expected_rmse, rel=8e-2, abs=8e-2
+    )

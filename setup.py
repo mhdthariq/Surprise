@@ -1,9 +1,9 @@
 # Build script - setuptools and Cython are available as build dependencies
-from setuptools import Extension, setup  # type: ignore[import-untyped]
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 from Cython.Build import cythonize  # type: ignore[import-untyped]
+from setuptools import Extension, setup  # type: ignore[import-untyped]
 
 """
 Prior to relying on PEP517/518 and using pyproject.toml, this setup.py used to

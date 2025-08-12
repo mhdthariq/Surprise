@@ -41,3 +41,38 @@ readme = { content-type = "text/markdown", file = ["README.md"] }
 
 [tool.setuptools.packages.find]
 exclude = ["tests*", "doc*", "examples*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.flake8]
+max-line-length = 88
+ignore = [
+    "E203", # whitespace before ':'
+    "E231", # missing whitespace after ':'
+    "E241", # multiple spaces after ':'
+    "E402", # module level import not at top of file
+    "W503", # line break before binary operator
+    "W504", # line break after binary operator
+    "F821", # undefined name
+    "E501", # line too long
+]
+exclude = [".git", "__pycache__", "dist", "build", "*.egg-info"]
+
+[tool.usort]
+first_party = ["surprise"]

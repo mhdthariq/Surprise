@@ -3,7 +3,7 @@ the :mod:`knns` module includes some k-NN inspired algorithms.
 """
 
 import heapq
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -212,7 +212,7 @@ class KNNWithMeans(SymmetricAlgo):
         neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
-        if hasattr(self, 'means'):
+        if hasattr(self, "means"):
             est = self.means[x]
         else:
             est = self.trainset.global_mean
@@ -294,7 +294,7 @@ class KNNBaseline(SymmetricAlgo):
             sim_options=sim_options,
             bsl_options=bsl_options,
             verbose=verbose,
-            **kwargs
+            **kwargs,
         )
 
         self.k = k
@@ -430,7 +430,7 @@ class KNNWithZScore(SymmetricAlgo):
         neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
-        if hasattr(self, 'means'):
+        if hasattr(self, "means"):
             est = self.means[x]
         else:
             est = self.trainset.global_mean
