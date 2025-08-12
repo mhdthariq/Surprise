@@ -5,7 +5,7 @@ This module contains the pytest fixtures.
 
 import os
 
-import pytest
+import pytest  # type: ignore
 
 from surprise import Dataset, Reader
 from surprise.model_selection import PredefinedKFold
