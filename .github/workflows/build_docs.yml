@@ -1,5 +1,5 @@
-# This workflow will install Python dependencies and run tests with a variety of Python versions
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+# This workflow will build the documentation using Sphinx
+# Documentation only needs to be built once with a single Python version
 
 name: Build docs
 
@@ -10,30 +10,70 @@ on:
     branches: ["master"]
 
 jobs:
-  build:
+  build-docs:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install Surprise with docs dependencies
+          python-version: "3.11" # Use stable version for docs
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-docs-${{ hashFiles('doc/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-docs-
+
+      - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           cd doc
           pip install -r requirements.txt
-      - name: Build docs
+
+      - name: Build documentation
         run: |
           cd doc
           make clean
           make html
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: the-docs
-          path: doc/build/html
+          name: documentation-html
+          path: doc/build/html/
+          retention-days: 30
+
+      - name: Check for broken links
+        continue-on-error: true
+        run: |
+          cd doc
+          make linkcheck
+
+      - name: Check documentation coverage
+        continue-on-error: true
+        run: |
+          cd doc
+          make coverage
+
+      - name: Validate documentation build
+        run: |
+          if [ ! -f "doc/build/html/index.html" ]; then
+            echo "Error: Documentation build failed - index.html not found"
+            exit 1
+          fi
+          echo "Documentation build successful"
+
+      - name: Upload linkcheck results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linkcheck-results
+          path: doc/build/linkcheck/
+          retention-days: 7
+          if-no-files-found: ignore
