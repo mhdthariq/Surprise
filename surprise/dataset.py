@@ -26,6 +26,7 @@ Summary:
 import itertools
 import os
 import sys
+import warnings
 from collections import defaultdict
 
 from .builtin_datasets import BUILTIN_DATASETS, download_builtin_dataset
@@ -41,9 +42,10 @@ class Dataset:
     (same goes for its derived classes), but instead use one of the three
     available methods for loading datasets."""
 
-    def __init__(self, reader):
+    def __init__(self, reader, rating_scale=None):
 
         self.reader = reader
+        self.rating_scale = rating_scale
 
     @classmethod
     def load_builtin(cls, name="ml-100k", prompt=True):
@@ -105,7 +107,7 @@ class Dataset:
         return cls.load_from_file(file_path=dataset.path, reader=reader)
 
     @classmethod
-    def load_from_file(cls, file_path, reader):
+    def load_from_file(cls, file_path, reader, rating_scale=None):
         """Load a dataset from a (custom) file.
 
         Use this if you want to use a custom dataset and all of the ratings are
@@ -118,12 +120,15 @@ class Dataset:
             file_path(:obj:`string`): The path to the file containing ratings.
             reader(:obj:`Reader <surprise.reader.Reader>`): A reader to read
                 the file.
+            rating_scale(:obj:`tuple`, optional): The rating scale used for every
+                rating. If specified, takes precedence over the rating_scale
+                specified in the reader. Default is ``None``.
         """
 
-        return DatasetAutoFolds(ratings_file=file_path, reader=reader)
+        return DatasetAutoFolds(ratings_file=file_path, reader=reader, rating_scale=rating_scale)
 
     @classmethod
-    def load_from_folds(cls, folds_files, reader):
+    def load_from_folds(cls, folds_files, reader, rating_scale=None):
         """Load a dataset where folds (for cross-validation) are predefined by
         some files.
 
@@ -142,13 +147,16 @@ class Dataset:
                 path_to_test_file)``.
             reader(:obj:`Reader <surprise.reader.Reader>`): A reader to read
                 the files.
+            rating_scale(:obj:`tuple`, optional): The rating scale used for every
+                rating. If specified, takes precedence over the rating_scale
+                specified in the reader. Default is ``None``.
 
         """
 
-        return DatasetUserFolds(folds_files=folds_files, reader=reader)
+        return DatasetUserFolds(folds_files=folds_files, reader=reader, rating_scale=rating_scale)
 
     @classmethod
-    def load_from_df(cls, df, reader):
+    def load_from_df(cls, df, reader, rating_scale=None):
         """Load a dataset from a pandas dataframe.
 
         Use this if you want to use a custom dataset that is stored in a pandas
@@ -161,10 +169,13 @@ class Dataset:
                 (raw) ids, and the ratings, in this order.
             reader(:obj:`Reader <surprise.reader.Reader>`): A reader to read
                 the file. Only the ``rating_scale`` field needs to be
-                specified.
+                specified if not provided at the dataset level.
+            rating_scale(:obj:`tuple`, optional): The rating scale used for every
+                rating. If specified, takes precedence over the rating_scale
+                specified in the reader. Default is ``None``.
         """
 
-        return DatasetAutoFolds(reader=reader, df=df)
+        return DatasetAutoFolds(reader=reader, df=df, rating_scale=rating_scale)
 
     def read_ratings(self, file_name):
         """Return a list of ratings (user, item, rating, timestamp) read from
@@ -210,13 +221,26 @@ class Dataset:
         n_items = len(ir)  # number of items
         n_ratings = len(raw_trainset)
 
+        # Determine rating scale: dataset-level takes precedence over reader-level
+        rating_scale = self.rating_scale
+        if rating_scale is None:
+            rating_scale = self.reader.rating_scale
+            # Issue deprecation warning if only reader has rating_scale
+            warnings.warn(
+                "Specifying rating_scale in Reader is deprecated. "
+                "Please specify it directly in Dataset.load_from_file(), "
+                "Dataset.load_from_folds(), or Dataset.load_from_df() instead.",
+                DeprecationWarning,
+                stacklevel=4
+            )
+
         trainset = Trainset(
             ur,
             ir,
             n_users,
             n_items,
             n_ratings,
-            self.reader.rating_scale,
+            rating_scale,
             raw2inner_id_users,
             raw2inner_id_items,
         )
@@ -232,9 +256,9 @@ class DatasetUserFolds(Dataset):
     """A derived class from :class:`Dataset` for which folds (for
     cross-validation) are predefined."""
 
-    def __init__(self, folds_files=None, reader=None):
+    def __init__(self, folds_files=None, reader=None, rating_scale=None):
 
-        Dataset.__init__(self, reader)
+        Dataset.__init__(self, reader, rating_scale)
         self.folds_files = folds_files
 
         # check that all files actually exist.
@@ -249,9 +273,9 @@ class DatasetAutoFolds(Dataset):
     cross-validation) are not predefined. (Or for when there are no folds at
     all)."""
 
-    def __init__(self, ratings_file=None, reader=None, df=None):
+    def __init__(self, ratings_file=None, reader=None, df=None, rating_scale=None):
 
-        Dataset.__init__(self, reader)
+        Dataset.__init__(self, reader, rating_scale)
         self.has_been_split = False  # flag indicating if split() was called.
 
         if ratings_file is not None:
