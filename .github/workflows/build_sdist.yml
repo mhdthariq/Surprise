@@ -100,9 +100,13 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11", "3.12", "3.13"]
         exclude:
-          # Reduce CI time by testing fewer combinations
+          # Windows and macOS only use Python 3.13
+          - os: macos-latest
+            python-version: "3.11"
           - os: macos-latest
             python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.11"
           - os: windows-latest
             python-version: "3.12"
 

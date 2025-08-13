@@ -1,4 +1,11 @@
 from . import dump, model_selection
+
+# Import similarities module (Cython extension)
+try:
+    from . import similarities  # type: ignore
+except ImportError:
+    # Handle case where Cython extension is not built
+    similarities = None
 from .builtin_datasets import get_dataset_dir
 from .dataset import Dataset
 from .prediction_algorithms import (
@@ -41,6 +48,7 @@ __all__ = [
     "KNNWithZScore",
     "get_dataset_dir",
     "model_selection",
+    "similarities",
 ]
 
 __version__ = "1.1.4"

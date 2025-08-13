@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Optimized matrix: Only Python 3.13 for all platforms, 3.11 for Ubuntu only
+        # Ubuntu keeps multiple Python versions, Windows/macOS only use 3.13
         include:
           - os: ubuntu-latest
             python-version: "3.11"
@@ -253,8 +253,7 @@ jobs:
               'processor': platform.processor()
           }
 
-          with open('benchmark_report_${{ matrix.os }}_py${{ matrix.python-version }}.json
-', 'w') as f:
+          with open('benchmark_report_${{ matrix.os }}_py${{ matrix.python-version }}.json', 'w') as f:
               json.dump(report, f, indent=2)
 
           print('[INFO] Benchmark report generated')
@@ -323,13 +322,11 @@ jobs:
             echo "No benchmark reports found." >> $GITHUB_STEP_SUMMARY
           else
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Summary:** $success_
-count/$total_count platforms completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "**Summary:** $success_count/$total_count platforms completed successfully" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Benchmark completed at:** $(
-date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Benchmark completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
 
           # Performance notes
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -337,4 +334,4 @@ date -u)" >> $GITHUB_STEP_SUMMARY
           echo "- Ubuntu: Full benchmark suite with optimized compilation" >> $GITHUB_STEP_SUMMARY
           echo "- macOS: Apple Silicon optimized with ARM64 targeting" >> $GITHUB_STEP_SUMMARY
           echo "- Windows: UTF-8 encoding with standard compilation" >> $GITHUB_STEP_SUMMARY
-          echo "- Testing focuses on Python 3.13 (latest) with 3.11 on Ubuntu for compatibility" >> $GITHUB_STEP_SUMMARY
+          echo "- Testing focuses on Python 3.11, 3.13 (Ubuntu) and Python 3.13 (macOS, Windows)" >> $GITHUB_STEP_SUMMARY

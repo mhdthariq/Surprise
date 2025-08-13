@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Optimized matrix: Latest Python on all platforms, older Python only on Linux
+        # Ubuntu keeps multiple Python versions, Windows/macOS only use 3.13
         include:
           - os: ubuntu-latest
             python-version: "3.11"
@@ -379,8 +379,8 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Python Versions Tested" >> $GITHUB_STEP_SUMMARY
-          echo "- Python 3.11 (Linux)" >> $GITHUB_STEP_SUMMARY
-          echo "- Python 3.13 (All Platforms)" >> $GITHUB_STEP_SUMMARY
+          echo "- Python 3.11, 3.13 (Ubuntu)" >> $GITHUB_STEP_SUMMARY
+          echo "- Python 3.13 (macOS, Windows)" >> $GITHUB_STEP_SUMMARY
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Platforms Tested" >> $GITHUB_STEP_SUMMARY

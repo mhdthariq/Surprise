@@ -8,7 +8,7 @@ and that the test files are correctly integrated.
 
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 try:
     import yaml

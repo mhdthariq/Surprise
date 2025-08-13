@@ -126,16 +126,8 @@ setup(
             return False
 
 
-def test_surprise_build():
-    """Test building Surprise extensions."""
-    print("\nTesting Surprise extension build...")
-
-    # Check if we're in the right directory
-    if not Path("setup.py").exists():
-        print("[FAIL] setup.py not found. Please run from Surprise root directory.")
-        return False
-
-    # Clean previous builds
+def _clean_build_dirs():
+    """Clean previous builds."""
     build_dirs = ["build", "dist", "*.egg-info"]
     for pattern in build_dirs:
         for path in Path(".").glob(pattern):
@@ -148,6 +140,66 @@ def test_surprise_build():
     for pyd_file in Path("surprise").rglob("*.pyd"):
         pyd_file.unlink()
 
+
+def _check_compiled_extensions():
+    """Check that compiled extensions were created."""
+    compiled_files = list(Path("surprise").rglob("*.so")) + list(Path("surprise").rglob("*.pyd"))
+    expected_extensions = [
+        "similarities",
+        "matrix_factorization",
+        "optimize_baselines",
+        "slope_one",
+        "co_clustering",
+    ]
+
+    found_extensions = []
+    for compiled_file in compiled_files:
+        for ext in expected_extensions:
+            if ext in compiled_file.name:
+                found_extensions.append(ext)
+                break
+
+    # If file detection fails, try import-based detection as fallback
+    if len(found_extensions) < len(expected_extensions):
+        print("File-based detection incomplete, trying import-based detection...")
+        found_extensions = _check_extensions_by_import()
+
+    missing = set(expected_extensions) - set(found_extensions)
+    return missing
+
+
+def _check_extensions_by_import():
+    """Check extensions by trying to import them."""
+    found_extensions = []
+    extension_imports = [
+        ("surprise.similarities", "similarities"),
+        ("surprise.prediction_algorithms.matrix_factorization", "matrix_factorization"),
+        ("surprise.prediction_algorithms.optimize_baselines", "optimize_baselines"),
+        ("surprise.prediction_algorithms.slope_one", "slope_one"),
+        ("surprise.prediction_algorithms.co_clustering", "co_clustering"),
+    ]
+
+    for module_name, ext_name in extension_imports:
+        try:
+            __import__(module_name)
+            found_extensions.append(ext_name)
+        except ImportError:
+            pass
+    return found_extensions
+
+
+def test_surprise_build():
+    """Test building Surprise extensions."""
+    print("\nTesting Surprise extension build...")
+
+    # Check if we're in the right directory
+    if not Path("setup.py").exists():
+        print("[FAIL] setup.py not found. Please run from Surprise root directory.")
+        return False
+
+    # Clean previous builds
+    _clean_build_dirs()
+
     # Try to build
     success, stdout, stderr = run_command(
         [sys.executable, "setup.py", "build_ext", "--inplace", "--force"]
@@ -156,49 +208,18 @@ def test_surprise_build():
     if success:
         print("[PASS] Surprise extensions built successfully")
 
-        # Check that extensions were created by looking for compiled files
-        # (cross-platform: .so on Linux/Mac, .pyd on Windows)
-        compiled_files = list(Path("surprise").rglob("*.so")) + list(Path("surprise").rglob("*.pyd"))
-        expected_extensions = [
-            "similarities",
-            "matrix_factorization",
-            "optimize_baselines",
-            "slope_one",
-            "co_clustering",
-        ]
-
-        found_extensions = []
-        for compiled_file in compiled_files:
-            for ext in expected_extensions:
-                if ext in compiled_file.name:
-                    found_extensions.append(ext)
-                    break
-
-        # If file detection fails, try import-based detection as fallback
-        if len(found_extensions) < len(expected_extensions):
-            print("File-based detection incomplete, trying import-based detection...")
-            found_extensions = []
-
-            extension_imports = [
-                ("surprise.similarities", "similarities"),
-                ("surprise.prediction_algorithms.matrix_factorization", "matrix_factorization"),
-                ("surprise.prediction_algorithms.optimize_baselines", "optimize_baselines"),
-                ("surprise.prediction_algorithms.slope_one", "slope_one"),
-                ("surprise.prediction_algorithms.co_clustering", "co_clustering"),
-            ]
-
-            for module_name, ext_name in extension_imports:
-                try:
-                    __import__(module_name)
-                    found_extensions.append(ext_name)
-                except ImportError:
-                    pass
-
-        missing = set(expected_extensions) - set(found_extensions)
+        missing = _check_compiled_extensions()
         if missing:
             print(f"[FAIL] Missing extensions: {missing}")
             return False
         else:
+            expected_extensions = [
+                "similarities",
+                "matrix_factorization",
+                "optimize_baselines",
+                "slope_one",
+                "co_clustering",
+            ]
             print(f"[PASS] All {len(expected_extensions)} extensions compiled")
             return True
     else:

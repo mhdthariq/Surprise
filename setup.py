@@ -114,7 +114,7 @@ def get_include_dirs():
 def get_extra_compile_args():
     """Get platform-specific compilation arguments."""
     import sys
-    import os
+
     import platform
 
     args = []
