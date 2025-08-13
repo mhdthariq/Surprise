@@ -29,7 +29,7 @@ import sys
 import warnings
 from collections import defaultdict
 
-from .builtin_datasets import BUILTIN_DATASETS, download_builtin_dataset
+from .builtin_datasets import get_builtin_datasets, download_builtin_dataset
 
 from .reader import Reader
 from .trainset import Trainset
@@ -71,19 +71,22 @@ class Dataset:
             ValueError: If the ``name`` parameter is incorrect.
         """
 
+        datasets = get_builtin_datasets()
         try:
-            dataset = BUILTIN_DATASETS[name]
+            dataset = datasets[name]
         except KeyError:
             raise ValueError(
                 "unknown dataset "
                 + name
                 + ". Accepted values are "
-                + ", ".join(BUILTIN_DATASETS.keys())
+                + ", ".join(datasets.keys())
                 + "."
             )
 
-        # if dataset does not exist, offer to download it
-        if not os.path.isfile(dataset.path):
+        # Build dynamic path and check if dataset exists
+        from .builtin_datasets import get_dataset_dir
+        dataset_path = os.path.join(get_dataset_dir(), dataset.relative_path)
+        if not os.path.isfile(dataset_path):
             answered = not prompt
             while not answered:
                 print(
@@ -104,7 +107,7 @@ class Dataset:
 
         reader = Reader(**dataset.reader_params)
 
-        return cls.load_from_file(file_path=dataset.path, reader=reader)
+        return cls.load_from_file(file_path=dataset_path, reader=reader)
 
     @classmethod
     def load_from_file(cls, file_path, reader, rating_scale=None):
@@ -120,12 +123,14 @@ class Dataset:
             file_path(:obj:`string`): The path to the file containing ratings.
             reader(:obj:`Reader <surprise.reader.Reader>`): A reader to read
                 the file.
-            rating_scale(:obj:`tuple`, optional): The rating scale used for every
-                rating. If specified, takes precedence over the rating_scale
-                specified in the reader. Default is ``None``.
+            rating_scale(:obj:`tuple`, optional): The rating scale used for
+                every rating. If specified, takes precedence over the
+                rating_scale specified in the reader. Default is ``None``.
         """
 
-        return DatasetAutoFolds(ratings_file=file_path, reader=reader, rating_scale=rating_scale)
+        return DatasetAutoFolds(
+            ratings_file=file_path, reader=reader, rating_scale=rating_scale
+        )
 
     @classmethod
     def load_from_folds(cls, folds_files, reader, rating_scale=None):
@@ -147,13 +152,15 @@ class Dataset:
                 path_to_test_file)``.
             reader(:obj:`Reader <surprise.reader.Reader>`): A reader to read
                 the files.
-            rating_scale(:obj:`tuple`, optional): The rating scale used for every
-                rating. If specified, takes precedence over the rating_scale
-                specified in the reader. Default is ``None``.
+            rating_scale(:obj:`tuple`, optional): The rating scale used for
+                every rating. If specified, takes precedence over the
+                rating_scale specified in the reader. Default is ``None``.
 
         """
 
-        return DatasetUserFolds(folds_files=folds_files, reader=reader, rating_scale=rating_scale)
+        return DatasetUserFolds(
+            folds_files=folds_files, reader=reader, rating_scale=rating_scale
+        )
 
     @classmethod
     def load_from_df(cls, df, reader, rating_scale=None):
@@ -262,10 +269,11 @@ class DatasetUserFolds(Dataset):
         self.folds_files = folds_files
 
         # check that all files actually exist.
-        for train_test_files in self.folds_files:
-            for f in train_test_files:
-                if not os.path.isfile(os.path.expanduser(f)):
-                    raise ValueError("File " + str(f) + " does not exist.")
+        if self.folds_files is not None:
+            for train_test_files in self.folds_files:
+                for f in train_test_files:
+                    if not os.path.isfile(os.path.expanduser(f)):
+                        raise ValueError("File " + str(f) + " does not exist.")
 
 
 class DatasetAutoFolds(Dataset):

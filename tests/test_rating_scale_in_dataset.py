@@ -10,7 +10,6 @@ import tempfile
 import os
 import warnings
 import pandas as pd
-import pytest
 
 from surprise import Dataset, Reader
 
