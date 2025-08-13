@@ -7,7 +7,7 @@ set. We then retrieve the top-10 prediction for each user.
 
 from collections import defaultdict
 
-from surprise import Dataset, SVD
+from surprise import SVD, Dataset
 
 
 def get_top_n(predictions, n=10):

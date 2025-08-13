@@ -8,7 +8,6 @@ import pandas as pd
 from surprise import Dataset, NormalPredictor, Reader
 from surprise.model_selection import cross_validate
 
-
 # Creation of the dataframe. Column names are irrelevant.
 ratings_dict = {
     "itemID": [1, 1, 1, 2, 2],

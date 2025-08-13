@@ -25,7 +25,6 @@ from .baseline_only import BaselineOnly
 from .co_clustering import CoClustering
 from .knns import KNNBaseline, KNNBasic, KNNWithMeans, KNNWithZScore
 from .matrix_factorization import NMF, SVD, SVDpp
-
 from .predictions import Prediction, PredictionImpossible
 from .random_pred import NormalPredictor
 from .slope_one import SlopeOne

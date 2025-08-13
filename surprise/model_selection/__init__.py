@@ -7,7 +7,6 @@ from .split import (
     ShuffleSplit,
     train_test_split,
 )
-
 from .validation import cross_validate
 
 __all__ = [

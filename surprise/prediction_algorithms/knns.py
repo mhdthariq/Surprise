@@ -3,14 +3,11 @@ the :mod:`knns` module includes some k-NN inspired algorithms.
 """
 
 import heapq
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
 from .algo_base import AlgoBase
-
 from .predictions import PredictionImpossible
-
 
 # Important note: as soon as an algorithm uses a similarity measure, it should
 # also allow the bsl_options parameter because of the pearson_baseline
@@ -28,13 +25,13 @@ class SymmetricAlgo(AlgoBase):
     reversed.
     """
 
-    yr: Optional[Dict[int, List[Tuple[int, float]]]]
-    xr: Optional[Dict[int, List[Tuple[int, float]]]]
-    sim: Optional[np.ndarray]
-    bu: Optional[np.ndarray]
-    bi: Optional[np.ndarray]
-    bx: Optional[np.ndarray]
-    by: Optional[np.ndarray]
+    yr: dict[int, list[tuple[int, float]]] | None
+    xr: dict[int, list[tuple[int, float]]] | None
+    sim: np.ndarray | None
+    bu: np.ndarray | None
+    bi: np.ndarray | None
+    bx: np.ndarray | None
+    by: np.ndarray | None
 
     def __init__(self, sim_options={}, verbose=True, **kwargs):
 

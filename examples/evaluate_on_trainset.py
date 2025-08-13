@@ -4,9 +4,8 @@ trainset.
 """
 
 
-from surprise import accuracy, Dataset, SVD
+from surprise import SVD, Dataset, accuracy
 from surprise.model_selection import KFold
-
 
 data = Dataset.load_builtin("ml-100k")
 

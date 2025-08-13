@@ -12,18 +12,17 @@ import surprise.dataset as dataset
 from surprise import __version__
 from surprise.builtin_datasets import get_dataset_dir
 from surprise.dataset import Dataset
-from surprise.model_selection import cross_validate, KFold, PredefinedKFold
-
+from surprise.model_selection import KFold, PredefinedKFold, cross_validate
 from surprise.prediction_algorithms import (
+    NMF,
+    SVD,
     BaselineOnly,
     CoClustering,
     KNNBaseline,
     KNNBasic,
     KNNWithMeans,
-    NMF,
     NormalPredictor,
     SlopeOne,
-    SVD,
     SVDpp,
 )
 from surprise.reader import Reader  # noqa

@@ -5,7 +5,8 @@ Module for testing the validation module.
 
 import os
 
-from surprise import Dataset, model_selection as ms, NormalPredictor, Reader
+from surprise import Dataset, NormalPredictor, Reader
+from surprise import model_selection as ms
 
 
 def test_cross_validate(toy_data):

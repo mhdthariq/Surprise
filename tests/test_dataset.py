@@ -7,13 +7,11 @@ import os
 import random
 
 import pandas as pd
-
 import pytest
 
 from surprise import BaselineOnly, Dataset, Reader
 from surprise.builtin_datasets import get_dataset_dir
 from surprise.model_selection import KFold, PredefinedKFold
-
 
 random.seed(1)
 

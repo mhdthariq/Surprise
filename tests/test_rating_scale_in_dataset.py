@@ -6,9 +6,10 @@ directly in Dataset.load_from_file(), Dataset.load_from_folds(), and
 Dataset.load_from_df() methods, with deprecation warnings for the old way.
 """
 
-import tempfile
 import os
+import tempfile
 import warnings
+
 import pandas as pd
 
 from surprise import Dataset, Reader

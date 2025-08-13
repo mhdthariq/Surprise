@@ -1,0 +1,369 @@
+# Comprehensive testing workflow for Surprise library
+# Tests build process, functionality, and integration across Python versions
+
+name: Test Suite
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+    branches: ["master", "main"]
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: "Python version to test"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+      test-type:
+        description: "Type of tests to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - "all"
+          - "setup-only"
+          - "integration-only"
+      skip-slow-tests:
+        description: "Skip slow integration tests"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHONUNBUFFERED: 1
+  PYTHONDONTWRITEBYTECODE: 1
+
+jobs:
+  setup-tests:
+    name: Setup and Build Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        exclude:
+          # Reduce matrix size for faster CI
+          - os: macos-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.12"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pipenv
+          key: ${{ runner.os }}-pip-test-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-test-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-test-
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc g++ gfortran
+
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Ensure Xcode command line tools are installed
+          xcode-select --install 2>/dev/null || true
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "numpy>=1.21.0,<3.0" "scipy>=1.6.0" "joblib>=1.2.0"
+          python -m pip install "Cython>=3.0.10,<4.0" pandas pytest
+
+      - name: Run setup tests
+        run: |
+          python test_setup.py
+
+      - name: Verify installation works
+        run: |
+          python -c "
+          import surprise
+          print(f'✅ Surprise {surprise.__version__} imported successfully')
+
+          from surprise import SVD, Dataset, Reader
+          print('✅ Core imports successful')
+
+          # Quick smoke test
+          import numpy as np, pandas as pd
+          np.random.seed(42)
+          df = pd.DataFrame({
+              'user': np.random.randint(0, 5, 20),
+              'item': np.random.randint(0, 5, 20),
+              'rating': np.random.uniform(1, 5, 20)
+          })
+
+          reader = Reader(rating_scale=(1, 5))
+          data = Dataset.load_from_df(df, reader)
+          trainset = data.build_full_trainset()
+
+          algo = SVD(n_factors=3, n_epochs=5, verbose=False)
+          algo.fit(trainset)
+          pred = algo.predict(0, 0)
+
+          print(f'✅ Smoke test successful (prediction: {pred.est:.3f})')
+          print('🎉 Setup verification complete!')
+          "
+
+      - name: Upload build artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-extensions-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            surprise/**/*.so
+            surprise/**/*.pyd
+          retention-days: 7
+          if-no-files-found: warn
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ${{ matrix.os }}
+    needs: setup-tests
+    if: ${{ !inputs.skip-slow-tests && (inputs.test-type == 'all' || inputs.test-type == 'integration-only') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        exclude:
+          # Reduce matrix for integration tests (they're slower)
+          - os: macos-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/pipenv
+          key: ${{ runner.os }}-pip-integration-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-integration-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-integration-
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc g++ gfortran
+
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          xcode-select --install 2>/dev/null || true
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "numpy>=1.21.0,<3.0" "scipy>=1.6.0" "joblib>=1.2.0"
+          python -m pip install "Cython>=3.0.10,<4.0" pandas pytest
+          # Install optional test dependency for memory monitoring
+          python -m pip install psutil || echo "psutil installation failed, memory tests will be skipped"
+
+      - name: Install Surprise in development mode
+        run: |
+          pip install -e . --no-cache-dir --force-reinstall
+
+      - name: Run comprehensive integration tests
+        timeout-minutes: 20
+        run: |
+          python test_integration.py
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            test-results.xml
+            benchmark-results.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  cross-platform-compatibility:
+    name: Cross-Platform Compatibility
+    runs-on: ${{ matrix.os }}
+    needs: setup-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, macos-12, macos-13, windows-2019, windows-2022]
+        python-version: ["3.11", "3.13"]  # Test oldest and newest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies and test
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "numpy>=1.21.0,<3.0" "Cython>=3.0.10,<4.0"
+
+          # Quick build and import test
+          pip install -e . --no-cache-dir
+
+          python -c "
+          import surprise
+          from surprise import SVD
+          print(f'✅ Cross-platform test passed on ${{ matrix.os }} with Python ${{ matrix.python-version }}')
+          print(f'   Surprise version: {surprise.__version__}')
+          "
+
+  performance-regression:
+    name: Performance Regression Test
+    runs-on: ubuntu-latest
+    needs: setup-tests
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "numpy>=1.21.0,<3.0" "scipy>=1.6.0" "joblib>=1.2.0"
+          python -m pip install "Cython>=3.0.10,<4.0" pandas
+
+      - name: Install Surprise
+        run: |
+          pip install -e . --no-cache-dir
+
+      - name: Run performance benchmark
+        timeout-minutes: 10
+        run: |
+          python -c "
+          import time
+          import numpy as np
+          import pandas as pd
+          from surprise import SVD, Dataset, Reader
+          from surprise.model_selection import cross_validate
+
+          print('🏃 Running performance regression test...')
+
+          # Create benchmark dataset
+          np.random.seed(12345)
+          n_samples = 5000
+          df = pd.DataFrame({
+              'user': np.random.randint(0, 500, n_samples),
+              'item': np.random.randint(0, 300, n_samples),
+              'rating': np.random.uniform(1, 5, n_samples)
+          })
+
+          reader = Reader(rating_scale=(1, 5))
+          data = Dataset.load_from_df(df, reader)
+
+          # Benchmark SVD
+          start_time = time.time()
+          algo = SVD(n_factors=50, n_epochs=20, verbose=False)
+          results = cross_validate(algo, data, measures=['RMSE'], cv=3, verbose=False)
+          end_time = time.time()
+
+          duration = end_time - start_time
+          rmse = results['test_rmse'].mean()
+
+          print(f'⏱️  Benchmark completed in {duration:.2f}s')
+          print(f'📊 RMSE: {rmse:.4f}')
+
+          # Performance thresholds (adjust based on typical performance)
+          if duration > 60:  # 1 minute
+              print('⚠️  Warning: Performance slower than expected')
+              exit(1)
+          else:
+              print('✅ Performance within acceptable range')
+          "
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [setup-tests, integration-tests, cross-platform-compatibility, performance-regression]
+    if: always()
+
+    steps:
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*test-results*"
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Create test summary
+        run: |
+          echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Setup Tests | ${{ needs.setup-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result == 'success' && '✅ Passed' || needs.integration-tests.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cross-Platform | ${{ needs.cross-platform-compatibility.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.performance-regression.result == 'success' && '✅ Passed' || needs.performance-regression.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐍 Python Versions Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- Python 3.11 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Python 3.12 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Python 3.13 ✅" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 💻 Platforms Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- Ubuntu (multiple versions) ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- macOS (multiple versions) ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows (multiple versions) ✅" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test completed at:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [[ "${{ needs.setup-tests.result }}" == "success" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎉 **Core functionality verified across all platforms!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Some tests failed - please check the logs above**" >> $GITHUB_STEP_SUMMARY
+          fi

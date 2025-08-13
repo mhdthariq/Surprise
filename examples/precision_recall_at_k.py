@@ -4,7 +4,7 @@ This module illustrates how to compute Precision at k and Recall at k metrics.
 
 from collections import defaultdict
 
-from surprise import Dataset, SVD
+from surprise import SVD, Dataset
 from surprise.model_selection import KFold
 
 

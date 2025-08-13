@@ -1,9 +1,9 @@
 from . import dump, model_selection
 from .builtin_datasets import get_dataset_dir
-
 from .dataset import Dataset
-
 from .prediction_algorithms import (
+    NMF,
+    SVD,
     AlgoBase,
     BaselineOnly,
     CoClustering,
@@ -11,12 +11,10 @@ from .prediction_algorithms import (
     KNNBasic,
     KNNWithMeans,
     KNNWithZScore,
-    NMF,
     NormalPredictor,
     Prediction,
     PredictionImpossible,
     SlopeOne,
-    SVD,
     SVDpp,
 )
 from .reader import Reader

@@ -3,7 +3,6 @@ from collections import Counter
 from copy import copy
 
 import numpy as np
-
 import pytest
 
 from surprise import Dataset, Reader
@@ -16,7 +15,6 @@ from surprise.model_selection import (
     train_test_split,
 )
 from surprise.model_selection.split import get_cv
-
 
 np.random.seed(1)  # This is bad
 

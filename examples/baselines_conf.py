@@ -6,7 +6,6 @@ computation.
 from surprise import BaselineOnly, Dataset, KNNBasic
 from surprise.model_selection import cross_validate
 
-
 # Load the movielens-100k dataset.
 data = Dataset.load_builtin("ml-100k")
 

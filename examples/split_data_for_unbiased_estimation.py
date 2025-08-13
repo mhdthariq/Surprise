@@ -7,9 +7,8 @@ its performances. The tuning is done by Grid Search.
 
 import random
 
-from surprise import accuracy, Dataset, SVD
+from surprise import SVD, Dataset, accuracy
 from surprise.model_selection import GridSearchCV
-
 
 # Load the full dataset.
 data = Dataset.load_builtin("ml-100k")

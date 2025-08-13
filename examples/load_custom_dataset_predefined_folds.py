@@ -8,7 +8,7 @@ if it were not built-in.
 
 import os
 
-from surprise import accuracy, Dataset, Reader, SVD
+from surprise import SVD, Dataset, Reader, accuracy
 from surprise.model_selection import PredefinedKFold
 
 # path to dataset folder

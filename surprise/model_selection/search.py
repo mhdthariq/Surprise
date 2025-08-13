@@ -2,11 +2,10 @@ from abc import ABC, abstractmethod
 from itertools import product
 
 import numpy as np
-from joblib import delayed, Parallel
+from joblib import Parallel, delayed
 
 from ..dataset import DatasetUserFolds
 from ..utils import get_rng
-
 from .split import get_cv
 from .validation import fit_and_score
 
@@ -59,14 +58,14 @@ class BaseSearchCV(ABC):
         if "sim_options" in params:
             sim_options = params["sim_options"]
             sim_options_list = [
-                dict(zip(sim_options, v)) for v in product(*sim_options.values())
+                dict(zip(sim_options, v, strict=False)) for v in product(*sim_options.values())
             ]
             params["sim_options"] = sim_options_list
 
         if "bsl_options" in params:
             bsl_options = params["bsl_options"]
             bsl_options_list = [
-                dict(zip(bsl_options, v)) for v in product(*bsl_options.values())
+                dict(zip(bsl_options, v, strict=False)) for v in product(*bsl_options.values())
             ]
             params["bsl_options"] = bsl_options_list
 
@@ -107,7 +106,7 @@ class BaseSearchCV(ABC):
             verbose=self.joblib_verbose,
         )(delayed_list)
 
-        (test_measures_dicts, train_measures_dicts, fit_times, test_times) = zip(*out)
+        (test_measures_dicts, train_measures_dicts, fit_times, test_times) = zip(*out, strict=False)
 
         # test_measures_dicts is a list of dict like this:
         # [{'mae': 1, 'rmse': 2}, {'mae': 2, 'rmse': 3} ...]
@@ -171,7 +170,7 @@ class BaseSearchCV(ABC):
         # Cv results: set fit and train times (mean, std)
         fit_times = np.array(fit_times).reshape(new_shape)
         test_times = np.array(test_times).reshape(new_shape)
-        for s, times in zip(("fit", "test"), (fit_times, test_times)):
+        for s, times in zip(("fit", "test"), (fit_times, test_times), strict=False):
             cv_results[f"mean_{s}_time"] = times.mean(axis=1)
             cv_results[f"std_{s}_time"] = times.std(axis=1)
 
@@ -334,7 +333,7 @@ class GridSearchCV(BaseSearchCV):
 
         self.param_grid = self._parse_options(param_grid.copy())
         self.param_combinations = [
-            dict(zip(self.param_grid, v)) for v in product(*self.param_grid.values())
+            dict(zip(self.param_grid, v, strict=False)) for v in product(*self.param_grid.values())
         ]
 
 
@@ -524,7 +523,7 @@ class RandomizedSearchCV(BaseSearchCV):
         if all_lists:
             # create exhaustive combinations
             param_grid = [
-                dict(zip(param_distributions, v))
+                dict(zip(param_distributions, v, strict=False))
                 for v in product(*param_distributions.values())
             ]
             combos = np.random.choice(param_grid, n_iter, replace=False)

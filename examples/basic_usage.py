@@ -4,9 +4,8 @@ algorithm, (down)load a dataset and run a cross-validation procedure.
 """
 
 
-from surprise import Dataset, SVD
+from surprise import SVD, Dataset
 from surprise.model_selection import cross_validate
-
 
 # Load the movielens-100k dataset (download it if needed),
 data = Dataset.load_builtin("ml-100k")

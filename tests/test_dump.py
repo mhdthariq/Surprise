@@ -7,18 +7,18 @@ import tempfile
 import pytest
 
 from surprise import (
+    NMF,
+    SVD,
     BaselineOnly,
     CoClustering,
-    dump,
     KNNBaseline,
     KNNBasic,
     KNNWithMeans,
     KNNWithZScore,
-    NMF,
     NormalPredictor,
     SlopeOne,
-    SVD,
     SVDpp,
+    dump,
 )
 from surprise.model_selection import PredefinedKFold
 

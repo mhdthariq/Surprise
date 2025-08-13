@@ -6,10 +6,9 @@ the mighty scikit learn.
 import time
 
 import numpy as np
-from joblib import delayed, Parallel
+from joblib import Parallel, delayed
 
 from .. import accuracy
-
 from .split import get_cv
 
 
@@ -107,7 +106,7 @@ def cross_validate(
     )
     out = Parallel(n_jobs=n_jobs, pre_dispatch=pre_dispatch)(delayed_list)
 
-    (test_measures_dicts, train_measures_dicts, fit_times, test_times) = zip(*out)
+    (test_measures_dicts, train_measures_dicts, fit_times, test_times) = zip(*out, strict=False)
 
     test_measures = dict()
     train_measures = dict()

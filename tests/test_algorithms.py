@@ -8,7 +8,8 @@ import os
 import pytest  # type: ignore
 
 from surprise import (
-    accuracy,
+    NMF,
+    SVD,
     BaselineOnly,
     CoClustering,
     Dataset,
@@ -16,12 +17,11 @@ from surprise import (
     KNNBasic,
     KNNWithMeans,
     KNNWithZScore,
-    NMF,
     NormalPredictor,
     Reader,
     SlopeOne,
-    SVD,
     SVDpp,
+    accuracy,
 )
 from surprise.model_selection import train_test_split
 

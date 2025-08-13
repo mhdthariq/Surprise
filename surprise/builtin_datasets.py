@@ -6,10 +6,9 @@ import os
 import ssl
 import zipfile
 from collections import namedtuple
-
 from os.path import join
-from urllib.request import urlretrieve, urlopen
 from urllib.error import URLError
+from urllib.request import urlopen, urlretrieve
 
 
 def get_dataset_dir():

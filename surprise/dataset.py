@@ -29,8 +29,7 @@ import sys
 import warnings
 from collections import defaultdict
 
-from .builtin_datasets import get_builtin_datasets, download_builtin_dataset
-
+from .builtin_datasets import download_builtin_dataset, get_builtin_datasets
 from .reader import Reader
 from .trainset import Trainset
 

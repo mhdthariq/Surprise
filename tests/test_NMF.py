@@ -6,7 +6,7 @@ Module for testing the NMF algorithm.
 import pandas as pd
 import pytest
 
-from surprise import Dataset, NMF, Reader
+from surprise import NMF, Dataset, Reader
 from surprise.model_selection import cross_validate
 
 

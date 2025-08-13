@@ -5,7 +5,7 @@ inherit.
 """
 import heapq
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 
@@ -31,7 +31,7 @@ class AlgoBase(ABC):
         self.sim_options = kwargs.get("sim_options", {})
         if "user_based" not in self.sim_options:
             self.sim_options["user_based"] = True
-        self.sim: Optional[np.ndarray] = None
+        self.sim: np.ndarray | None = None
 
     def fit(self, trainset):
         """Train an algorithm on a given training set.
@@ -57,7 +57,7 @@ class AlgoBase(ABC):
         return self
 
     @abstractmethod
-    def estimate(self, u, i) -> Union[float, Tuple[float, Dict[str, Any]]]:
+    def estimate(self, u, i) -> float | tuple[float, dict[str, Any]]:
         """Estimate rating for user u and item i.
 
         Args:

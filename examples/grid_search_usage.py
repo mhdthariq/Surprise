@@ -4,7 +4,7 @@ parameter combination of a given algorithm.
 """
 
 
-from surprise import Dataset, SVD
+from surprise import SVD, Dataset
 from surprise.model_selection import GridSearchCV
 
 # Use movielens-100K

@@ -9,13 +9,13 @@ import numpy as np
 import pytest
 from scipy.stats import randint, uniform
 
-from surprise import Dataset, Reader, SVD
+from surprise import SVD, Dataset, Reader
 from surprise.model_selection import (
-    cross_validate,
     GridSearchCV,
     KFold,
     PredefinedKFold,
     RandomizedSearchCV,
+    cross_validate,
 )
 
 

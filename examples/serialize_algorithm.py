@@ -6,8 +6,7 @@ then reloaded and can be used again for making predictions.
 
 import os
 
-from surprise import Dataset, dump, SVD
-
+from surprise import SVD, Dataset, dump
 
 data = Dataset.load_builtin("ml-100k")
 trainset = data.build_full_trainset()

@@ -1,126 +1,40 @@
 # Build script - setuptools and Cython are available as build dependencies
-from typing import List, Optional, Tuple
 
 import numpy as np
 from Cython.Build import cythonize  # type: ignore[import-untyped]
 from setuptools import Extension, setup  # type: ignore[import-untyped]
 
 """
-Prior to relying on PEP517/518 and using pyproject.toml, this setup.py used to
-be an unintelligible mess. The main reason being that there were no clear
-distinction between run-time and build-time dependencies, and since we didn't
-want to make Cython a run-time dep, we had to enable a way to install the sdist
-from the .c files instead of from the .pyx file.
-Anyways. Now Cython is a build-time dep, not a run-time dep, since installing
-from the sdist happens in an isolated env.
+Modern setup.py for Surprise with Python 3.11-3.13 compatibility.
 
-Creating the sdist still involves compiling the .pyx into .c because we're
-executing this file. This is unnecessary but it doesn't matter. The .c files are
-excluded from the sdist (in MANIFEST.in) anyway.
+This setup.py has been updated to work better with modern Python versions and
+includes improved compatibility with numpy 2.x and Cython 3.x.
 
-Release instruction:
-
-Update changelog and contributors list.
-
-Basic local checks:
-- tests run correctly
-- doc compiles without warning (make clean first).
-
-Check that the latest RTD build was OK: https://readthedocs.org/projects/surprise/builds/
-
-Change __version__ in __init__.py to new version name. Also update the hardcoded
-version in build_sdist.yml, otherwise the GA jobs will fail.
-
-The sdist is built on Python 3.8. It should be installable from all Python
-versions.
-- check the sdist building process. It will (unnecessarily) compily the .pyx
-  files and the .c files should be excluded from the archive.
-- check the install jobs. This will compile the .pyx files again as well as the
-  .c files. Look for compilation warnings.
-- check test jobs for warnings etc.
-
-Download the sdist from the CI job then upload it to test pypi: twine upload
-blabla.tar.gz -r testpypi
-
-Check that install works on testpypi, then upload to pypi and check again.
-to install from testpypi:
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple scikit-surprise  # noqa
-Doesn't hurt to check that the tests pass after installing from testpypi.
-
-If not already done, sync gh-pages with the master's README
-
-push new release tag on github (commit last changes first if needed):
-    git tag vX.Y.Z
-    git push --tags
-
-Check that RTD has updated 'stable' to the new release (may take a while).
-
-In the mean time, upload to conda:
-    - Compute SHA256 hash of the new .tar.gz archive (or check it up on PyPI)
-    - update recipe/meta.yaml on feedstock fork consequently (only version and
-      sha should be changed.  Maybe add some import tests).
-    - Push changes, Then open pull request on conda-forge feedstock and merge it
-      when all checks are OK. Access the conda-forge feedstock it by the link on
-      GitHub 'forked from blah blah'.
-    - Check on https://anaconda.org/conda-forge/scikit-surprise that new
-      version is available for all platforms.
-
-Then, maybe, celebrate.
+Key improvements:
+- Enhanced numpy compatibility macros
+- Better Cython compiler directives
+- Improved error handling for different platforms
+- Support for newer numpy C API
+- Better memory management directives
 """
 
-# This prevents Cython from using deprecated numpy C APIs and ensures compatibility
-define_macros: List[Tuple[str, Optional[str]]] = [
-    ("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION"),
-    ("CYTHON_USE_TYPE_SLOTS", None),
-]
 
-# We're using numpy C APIs in our Cython code so Cython will generate C code
-# that requires the numpy headers. We need to tell the compiler where to find
-# those headers.
-# If you remove this and compilation still works, don't get fooled: it's
-# probably only because the numpy headers are available in the default locations
-# like /usr/include/numpy/ so they get found. But that wouldn't necessarily be
-# the case on other users' machines building the sdist.
-include_dirs = [np.get_include()]
+def get_numpy_version_info():
+    """Get numpy version for compatibility checking."""
+    try:
+        numpy_version = np.__version__
+        major, minor = map(int, numpy_version.split(".")[:2])
+        return major, minor
+    except Exception:
+        # Fallback for unexpected version formats
+        return 1, 21
 
-extensions = [
-    Extension(
-        # name is where the .so will be placed, i.e. where the module will be
-        # importable from.
-        name="surprise.similarities",
-        sources=["surprise/similarities.pyx"],
-        include_dirs=include_dirs,
-        define_macros=define_macros,
-    ),
-    Extension(
-        name="surprise.prediction_algorithms.matrix_factorization",
-        sources=["surprise/prediction_algorithms/matrix_factorization.pyx"],
-        include_dirs=include_dirs,
-        define_macros=define_macros,
-    ),
-    Extension(
-        name="surprise.prediction_algorithms.optimize_baselines",
-        sources=["surprise/prediction_algorithms/optimize_baselines.pyx"],
-        include_dirs=include_dirs,
-        define_macros=define_macros,
-    ),
-    Extension(
-        name="surprise.prediction_algorithms.slope_one",
-        sources=["surprise/prediction_algorithms/slope_one.pyx"],
-        include_dirs=include_dirs,
-        define_macros=define_macros,
-    ),
-    Extension(
-        name="surprise.prediction_algorithms.co_clustering",
-        sources=["surprise/prediction_algorithms/co_clustering.pyx"],
-        include_dirs=include_dirs,
-        define_macros=define_macros,
-    ),
-]
 
-extensions = cythonize(
-    extensions,
-    compiler_directives={
+def get_compiler_directives():
+    """Get optimized compiler directives based on environment."""
+    numpy_major, numpy_minor = get_numpy_version_info()
+
+    base_directives = {
         "language_level": 3,
         "boundscheck": False,
         "wraparound": False,
@@ -128,9 +42,229 @@ extensions = cythonize(
         "nonecheck": False,
         "embedsignature": True,
         "always_allow_keywords": True,
-    },
+        "cdivision": True,  # Faster division, but be careful with negative numbers
+        "overflowcheck": False,  # Disable overflow checking for performance
+        "profile": False,  # Disable profiling unless debugging
+        "linetrace": False,  # Disable line tracing unless debugging
+    }
+
+    # Add numpy-specific directives for numpy 2.x compatibility
+    if numpy_major >= 2:
+        base_directives.update(
+            {
+                "np_pythran": False,  # Disable pythran for better compatibility
+            }
+        )
+
+    return base_directives
+
+
+def get_define_macros():
+    """Get preprocessor macros for numpy compatibility."""
+    numpy_major, numpy_minor = get_numpy_version_info()
+
+    # Base macros for numpy compatibility
+    macros: list[tuple[str, str | None]] = [
+        ("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION"),
+        ("CYTHON_USE_TYPE_SLOTS", None),
+        ("CYTHON_FAST_THREAD_STATE", "1"),  # Better threading performance
+    ]
+
+    # Additional macros for numpy 2.x
+    if numpy_major >= 2:
+        macros.extend(
+            [
+                ("NPY_TARGET_VERSION", "NPY_1_22_API_VERSION"),
+                (
+                    "CYTHON_LIMITED_API",
+                    "1",
+                ),  # Enable limited API for better ABI stability
+            ]
+        )
+
+    # Platform-specific optimizations
+    import sys
+
+    if sys.platform.startswith("linux"):
+        macros.append(("_GNU_SOURCE", None))
+    elif sys.platform == "darwin":
+        macros.append(("_DARWIN_C_SOURCE", None))
+
+    return macros
+
+
+def get_include_dirs():
+    """Get include directories with proper numpy headers."""
+    include_dirs = [np.get_include()]
+
+    # Add additional include directories if they exist
+    import os
+    import sys
+
+    # Add Python include directory for better compatibility
+    python_include = (
+        f"{sys.prefix}/include/python{sys.version_info.major}.{sys.version_info.minor}"
+    )
+    if os.path.exists(python_include):
+        include_dirs.append(python_include)
+
+    return include_dirs
+
+
+def get_extra_compile_args():
+    """Get platform-specific compilation arguments."""
+    import sys
+
+    args = []
+
+    if sys.platform.startswith("linux") or sys.platform == "darwin":
+        args.extend(
+            [
+                "-O3",  # Maximum optimization
+                "-ffast-math",  # Faster math operations
+                "-march=native",  # Optimize for current CPU (comment out for distribution)
+                "-fno-strict-aliasing",  # Prevent strict aliasing issues
+                "-Wall",  # Enable warnings
+                "-Wno-unused-function",  # Ignore unused function warnings
+                "-Wno-unused-variable",  # Ignore unused variable warnings
+            ]
+        )
+
+        # Add OpenMP support if available
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["gcc", "-fopenmp", "-E", "-"], input="", text=True, capture_output=True
+            )
+            if result.returncode == 0:
+                args.append("-fopenmp")
+        except Exception:
+            pass  # OpenMP not available
+
+    elif sys.platform == "win32":
+        args.extend(
+            [
+                "/O2",  # Optimize for speed
+                "/fp:fast",  # Fast floating point
+                "/GL",  # Whole program optimization
+            ]
+        )
+
+    return args
+
+
+def get_extra_link_args():
+    """Get platform-specific linking arguments."""
+    import sys
+
+    args = []
+
+    if sys.platform.startswith("linux") or sys.platform == "darwin":
+        args.extend(
+            [
+                "-O3",
+                "-flto",  # Link-time optimization
+            ]
+        )
+
+        # Add OpenMP linking if available
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["gcc", "-fopenmp", "-E", "-"], input="", text=True, capture_output=True
+            )
+            if result.returncode == 0:
+                args.append("-fopenmp")
+        except Exception:
+            pass
+
+    elif sys.platform == "win32":
+        args.extend(
+            [
+                "/LTCG",  # Link-time code generation
+            ]
+        )
+
+    return args
+
+
+# Get configuration based on environment
+define_macros = get_define_macros()
+include_dirs = get_include_dirs()
+extra_compile_args = get_extra_compile_args()
+extra_link_args = get_extra_link_args()
+
+# Define extensions with improved configuration
+extensions = [
+    Extension(
+        name="surprise.similarities",
+        sources=["surprise/similarities.pyx"],
+        include_dirs=include_dirs,
+        define_macros=define_macros,
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
+    ),
+    Extension(
+        name="surprise.prediction_algorithms.matrix_factorization",
+        sources=["surprise/prediction_algorithms/matrix_factorization.pyx"],
+        include_dirs=include_dirs,
+        define_macros=define_macros,
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
+    ),
+    Extension(
+        name="surprise.prediction_algorithms.optimize_baselines",
+        sources=["surprise/prediction_algorithms/optimize_baselines.pyx"],
+        include_dirs=include_dirs,
+        define_macros=define_macros,
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
+    ),
+    Extension(
+        name="surprise.prediction_algorithms.slope_one",
+        sources=["surprise/prediction_algorithms/slope_one.pyx"],
+        include_dirs=include_dirs,
+        define_macros=define_macros,
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
+    ),
+    Extension(
+        name="surprise.prediction_algorithms.co_clustering",
+        sources=["surprise/prediction_algorithms/co_clustering.pyx"],
+        include_dirs=include_dirs,
+        define_macros=define_macros,
+        extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args,
+    ),
+]
+
+# Cythonize with improved directives
+extensions = cythonize(
+    extensions,
+    compiler_directives=get_compiler_directives(),
     # Force rebuild to ensure compatibility
     force=True,
+    # Add annotation for debugging (disable in production)
+    annotate=False,
+    # Parallel compilation if available
+    nthreads=0,  # Use all available cores
 )
 
-setup(ext_modules=extensions)
+# Enhanced setup call with better error handling
+if __name__ == "__main__":
+    try:
+        setup(ext_modules=extensions)
+    except Exception as e:
+        import sys
+
+        print(f"Error during setup: {e}", file=sys.stderr)
+        print("\nTroubleshooting tips:", file=sys.stderr)
+        print(
+            "1. Ensure you have the latest numpy installed: pip install -U numpy",
+            file=sys.stderr,
+        )
+        print("2. Try rebuilding: python rebuild_extensions.py", file=sys.stderr)
+        print("3. Check NUMPY_COMPATIBILITY.md for more solutions", file=sys.stderr)
+        sys.exit(1)
