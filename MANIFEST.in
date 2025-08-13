@@ -1,7 +1,61 @@
+# Include core documentation files
 include README.md
 include LICENSE.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include TODO.md
+
+# Include configuration files
+include .coveragerc
+include .git-blame-ignore-revs
+include .readthedocs.yaml
+
+# Include build and utility scripts
+include *.py
+include *.sh
+include rebuild_extensions.py
+include test_integration.py
+include test_setup.py
+include verify_installation.py
+include verify_workflows.py
+
+# Include assets
+include *.svg
+include logo_black.svg
+
+# Include all markdown files
+include *.md
+
+# Include all YAML files
+include *.yaml
+
+# Include documentation
 recursive-include doc *
+
+# Include examples
 recursive-include examples *
+
+# Include all test files and data
+recursive-include tests *
+
+# Include Cython source files but exclude compiled C files
 recursive-include surprise *.pyx
+recursive-include surprise *.pxd
 recursive-exclude surprise *.c
+
+# Exclude compiled extensions and build artifacts
 recursive-exclude surprise *.so
+recursive-exclude surprise *.pyd
+recursive-exclude surprise *.dll
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude *.egg-info
+prune build
+prune dist
+prune .git
+prune .pytest_cache
+prune .ruff_cache
+prune .venv
+prune __pycache__

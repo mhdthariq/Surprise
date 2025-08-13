@@ -55,12 +55,12 @@ def test_import_dependencies():
                 version = setuptools.__version__
             else:
                 version = "unknown"
-            print(f"✓ {dep_name}: {version}")
+            print(f"[PASS] {dep_name}: {version}")
         except ImportError:
-            print(f"✗ {dep_name}: Not available")
+            print(f"[FAIL] {dep_name}: Not available")
             return False
         except Exception as e:
-            print(f"✗ {dep_name}: Error - {e}")
+            print(f"[FAIL] {dep_name}: Error - {e}")
             return False
 
     return True
@@ -119,10 +119,10 @@ setup(
         )
 
         if success:
-            print("✓ Cython compilation successful")
+            print("[PASS] Cython compilation successful")
             return True
         else:
-            print(f"✗ Cython compilation failed: {stderr}")
+            print(f"[FAIL] Cython compilation failed: {stderr}")
             return False
 
 
@@ -132,7 +132,7 @@ def test_surprise_build():
 
     # Check if we're in the right directory
     if not Path("setup.py").exists():
-        print("✗ setup.py not found. Please run from Surprise root directory.")
+        print("[FAIL] setup.py not found. Please run from Surprise root directory.")
         return False
 
     # Clean previous builds
@@ -152,7 +152,7 @@ def test_surprise_build():
     )
 
     if success:
-        print("✓ Surprise extensions built successfully")
+        print("[PASS] Surprise extensions built successfully")
 
         # Check that .so files were created
         so_files = list(Path("surprise").rglob("*.so"))
@@ -172,13 +172,13 @@ def test_surprise_build():
 
         missing = set(expected_extensions) - set(found_extensions)
         if missing:
-            print(f"✗ Missing extensions: {missing}")
+            print(f"[FAIL] Missing extensions: {missing}")
             return False
         else:
-            print(f"✓ All {len(expected_extensions)} extensions compiled")
+            print(f"[PASS] All {len(expected_extensions)} extensions compiled")
             return True
     else:
-        print(f"✗ Surprise build failed: {stderr}")
+        print(f"[FAIL] Surprise build failed: {stderr}")
         return False
 
 
@@ -189,7 +189,7 @@ def test_surprise_import():
     try:
         import surprise
 
-        print(f"✓ Basic import successful (version: {surprise.__version__})")
+        print(f"[PASS] Basic import successful (version: {surprise.__version__})")
 
         # Test specific extensions
         extensions_to_test = [
@@ -206,15 +206,15 @@ def test_surprise_import():
         for module_name, ext_name in extensions_to_test:
             try:
                 __import__(module_name)
-                print(f"✓ {ext_name} extension imported")
+                print(f"[PASS] {ext_name} extension imported")
             except ImportError as e:
-                print(f"✗ {ext_name} extension failed: {e}")
+                print(f"[FAIL] {ext_name} extension failed: {e}")
                 return False
 
         return True
 
     except ImportError as e:
-        print(f"✗ Surprise import failed: {e}")
+        print(f"[FAIL] Surprise import failed: {e}")
         return False
 
 
@@ -262,14 +262,14 @@ def test_surprise_functionality():
             rmse = np.sqrt(
                 np.mean([(pred.est - pred.r_ui) ** 2 for pred in predictions])
             )
-            print(f"✓ Algorithm test successful (RMSE: {rmse:.3f})")
+            print(f"[PASS] Algorithm test successful (RMSE: {rmse:.3f})")
             return True
         else:
-            print("✗ No predictions generated")
+            print("[FAIL] No predictions generated")
             return False
 
     except Exception as e:
-        print(f"✗ Functionality test failed: {e}")
+        print(f"[FAIL] Functionality test failed: {e}")
         return False
 
 
@@ -297,7 +297,7 @@ def main():
             success = test_func()
             results.append((test_name, success))
         except Exception as e:
-            print(f"✗ Test {test_name} crashed: {e}")
+            print(f"[FAIL] Test {test_name} crashed: {e}")
             results.append((test_name, False))
 
     # Summary
@@ -315,10 +315,10 @@ def main():
     print(f"\nTotal: {passed}/{len(results)} tests passed")
 
     if passed == len(results):
-        print("\n🎉 All tests passed! Your setup is working correctly.")
+        print("\n[SUCCESS] All tests passed! Your setup is working correctly.")
         return 0
     else:
-        print(f"\n❌ {len(results) - passed} test(s) failed. Check the output above.")
+        print(f"\n[ERROR] {len(results) - passed} test(s) failed. Check the output above.")
         print("\nTroubleshooting tips:")
         print(
             "1. Ensure all dependencies are installed: pip install numpy Cython setuptools"

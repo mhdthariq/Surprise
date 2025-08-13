@@ -114,6 +114,8 @@ def get_include_dirs():
 def get_extra_compile_args():
     """Get platform-specific compilation arguments."""
     import sys
+    import os
+    import platform
 
     args = []
 
@@ -122,13 +124,26 @@ def get_extra_compile_args():
             [
                 "-O3",  # Maximum optimization
                 "-ffast-math",  # Faster math operations
-                "-march=native",  # Optimize for current CPU (comment out for distribution)
                 "-fno-strict-aliasing",  # Prevent strict aliasing issues
                 "-Wall",  # Enable warnings
                 "-Wno-unused-function",  # Ignore unused function warnings
                 "-Wno-unused-variable",  # Ignore unused variable warnings
+                "-Wno-unreachable-code",  # Ignore unreachable code warnings (Apple Silicon)
             ]
         )
+
+        # Handle Apple Silicon CPU targeting issues
+        if sys.platform == "darwin":
+            # Check if we're on Apple Silicon
+            if platform.machine() in ["arm64", "aarch64"] or "arm" in platform.machine().lower():
+                # Use generic ARM64 optimization instead of specific CPU models
+                args.append("-mcpu=apple-a14")  # Safe fallback for Apple Silicon
+            else:
+                # Intel Mac
+                args.append("-march=native")
+        else:
+            # Linux - use native optimization
+            args.append("-march=native")
 
         # Add OpenMP support if available
         try:
@@ -157,6 +172,7 @@ def get_extra_compile_args():
 def get_extra_link_args():
     """Get platform-specific linking arguments."""
     import sys
+    import platform
 
     args = []
 
@@ -164,9 +180,16 @@ def get_extra_link_args():
         args.extend(
             [
                 "-O3",
-                "-flto",  # Link-time optimization
             ]
         )
+
+        # Only add LTO on platforms where it's stable
+        if sys.platform.startswith("linux"):
+            args.append("-flto")  # Link-time optimization
+        elif sys.platform == "darwin":
+            # Be more conservative with LTO on macOS, especially Apple Silicon
+            if not (platform.machine() in ["arm64", "aarch64"] or "arm" in platform.machine().lower()):
+                args.append("-flto")
 
         # Add OpenMP linking if available
         try:
